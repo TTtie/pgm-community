@@ -118,7 +118,7 @@ public class SquadFeature extends FeatureBase implements SquadIntegration {
 
   private void updateSquad(@Nullable MatchPlayer player, Squad squad) {
     // Auto-disband solo squads with no invites
-    if (squad.totalSize() <= 1 && squads.remove(squad)) {
+    if (squad.totalSize() <= 1 && squad.getInvites().isEmpty() && squads.remove(squad)) {
       squad.sendWarning(translatable("squad.disband.empty"));
     }
     if (player != null) {
@@ -142,7 +142,6 @@ public class SquadFeature extends FeatureBase implements SquadIntegration {
     Squad newSquad = new Squad(leader.getId());
     squads.add(newSquad);
 
-    updateSquad(leader, newSquad);
     return newSquad;
   }
 

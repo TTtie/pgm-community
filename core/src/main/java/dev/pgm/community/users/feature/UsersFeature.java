@@ -28,6 +28,7 @@ public interface UsersFeature extends Feature {
   default CompletableFuture<Component> renderUsername(UUID userId, NameStyle style) {
     return renderUsername(Optional.ofNullable(userId), style);
   }
+
   /**
    * Render a player name by looking up cached value or using database stored name
    *
