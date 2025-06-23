@@ -14,6 +14,9 @@ public class CommunityConfig {
   private RanksConfig ranks;
   private String storeLink;
 
+  private String mojangAPIAddress;
+  private String randomNameAPIAddress;
+
   public CommunityConfig(Configuration config) {
     reload(config);
   }
@@ -25,6 +28,8 @@ public class CommunityConfig {
     this.useEnvironment = config.getBoolean("general.use-environment");
     this.environmentServerIdKey = config.getString("general.environment-server-id");
     this.storeLink = config.getString("general.store-link");
+    this.mojangAPIAddress = config.getString("general.mojang-api");
+    this.randomNameAPIAddress = config.getString("general.randomname-api");
   }
 
   public String getServerDisplayName() {
@@ -51,5 +56,13 @@ public class CommunityConfig {
 
   public String getStoreLink() {
     return storeLink;
+  }
+
+  public String getMojangAPIAddress() {
+    return mojangAPIAddress;
+  }
+
+  public String getRandomNameAPIAddress() {
+    return randomNameAPIAddress;
   }
 }

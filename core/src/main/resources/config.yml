@@ -9,14 +9,20 @@ general:
   # Unique identifier for the server, used for cross-server tracking.
   server-id: "occ"
 
-  # Determine whether to utilize the Environment API to retrieve the server ID.
+  # Determine whether to use the Environment API to retrieve the server ID.
   use-environment: false
 
   # The specific key ID used for fetching the server ID from the Environment API.
   environment-server-id: "server-id"
   
-  # Store link used to advertise in specfic messages
+  # Store link used to advertise in specific messages
   store-link: "https://oc.tc/store"
+
+  # Where Mojang account details are fetched from
+  mojang-api: "https://api.ashcon.app/mojang/v2/user/"
+
+  # Where random usernames are fetched from (Nicknames)
+  randomname-api: "https://api.gamertag.dev/random"
 
 # Ranks    
 ranks:
@@ -46,7 +52,7 @@ moderation:
   #Message options for kick screen
   rules-link: "https://pgm.dev/rules" # Link to rules
   appeal-link: "&7If this ban was made in error, contact &estaff@pgm.dev" # Appeal message (Only shown for perm-bans)
-  staff-signoff: true # Whether staff name will be revealed in kick screen (for non disguised staff)
+  staff-signoff: true # Whether staff name will be revealed in kick screen (for non-disguised staff)
 
   # Broadcast message format for Punishments
   #
@@ -107,7 +113,7 @@ reports:
   persist:  true   # Whether to save to database 
   cooldown: 15     # Duration of cooldown in seconds
   
-  menu: true        # Whether /report will utilize a menu, false for custom input only
+  menu: true        # Whether /report will use a menu, false for custom input only
   allow-input: true # If we should always accept custom reports when provided a reason
   
   notify-sender: true  # If report senders should be notified of successful reports
@@ -196,7 +202,7 @@ motd:
     - "&cWelcome to &4&lCommunity"
     - "&6To configure this message check the &aconfig.yml"      
 
-# Broadcast - Broadcast announcement via /broadcast with ability to send as title or chat only
+# Broadcast - Broadcast announcement via /broadcast with the ability to send as title or chat only
 broadcast:
   enabled: true
   sound: true                  # Whether a small sound will be played
@@ -234,8 +240,8 @@ requests:
     map-cooldown: 10        # How much to multiply match duration by for map cooldown
     use-pgm-cooldowns: true # Whether to hook into PGMs persistent map cooldown storage
     limit: 10               # Maximum number of sponsor requests allowed at one time
-    daily-tokens: 1         # Amount of tokens given on a daily basis (community.token.daily perm)
-    weekly-tokens: 1        # Amount of tokens given on a weekly basis (community.token.weekly perm)
+    daily-tokens: 1         # Number of tokens given on a daily basis (community.token.daily perm)
+    weekly-tokens: 1        # Number of tokens given on a weekly basis (community.token.weekly perm)
     max-tokens: 7           # Maximum amount of tokens an account can collect
     refund: true            # Tokens are refunded when map vote is successful
     scale-factor: 0.45      # Scaling factor for adjusting the upper bound of map size selection
@@ -261,7 +267,7 @@ party:
   # General event settings
   settings:
     login-message: true # If a login message should be sent to notify new players of party
-    party-notifications: true # If title & chat message should be sent when party starts/stops
+    party-notifications: true # If a title and chat message should be sent when party starts/stops
     raindrop-activate: "rdm set 1.5" # Command used to enable raindrop multiplier
     raindrop-deactivate: "rdm clear" # Command used to disable raindrop multiplier
 
@@ -343,7 +349,7 @@ history:
   # Set to true to enable match history, false to disable.
   enabled: true
 
-# Network - Features which assist in running Community on multiple servers  
+# Network - Features which help in running Community on multiple servers
 network:
   enabled: false  
   id: "" # Network id of server, leave blank for randomly generated

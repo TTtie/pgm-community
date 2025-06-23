@@ -23,8 +23,16 @@ import org.jetbrains.annotations.Nullable;
 public class WebUtils {
 
   // A big thanks to @Electroid for all these awesome APIs :)
-  private static final String RANDOM_NAME_API = "https://api.gamertag.dev/random";
-  private static final String USERNAME_API = "https://api.ashcon.app/mojang/v2/user/";
+  private static String RANDOM_NAME_API = "https://api.gamertag.dev/random";
+  private static String USERNAME_API = "https://api.ashcon.app/mojang/v2/user/";
+
+  public static void setRandomNameAPI(String address) {
+    RANDOM_NAME_API = address;
+  }
+
+  public static void setUsernameAPI(String address) {
+    USERNAME_API = address;
+  }
 
   /** Fetch a list of random minecraft usernames */
   public static CompletableFuture<List<String>> getRandomNameList(int size) {

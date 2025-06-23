@@ -7,6 +7,7 @@ import dev.pgm.community.feature.FeatureManager;
 import dev.pgm.community.squads.SquadChannel;
 import dev.pgm.community.text.TextTranslations;
 import dev.pgm.community.utils.PGMUtils;
+import dev.pgm.community.utils.WebUtils;
 import fr.minuskube.inv.InventoryManager;
 import java.util.Random;
 import org.bukkit.Bukkit;
@@ -60,6 +61,9 @@ public class Community extends JavaPlugin {
     this.reloadConfig();
     config.reload(getConfig());
     features.reloadConfig(getConfig());
+
+    WebUtils.setRandomNameAPI(config.getRandomNameAPIAddress());
+    WebUtils.setUsernameAPI(config.getMojangAPIAddress());
   }
 
   private void setupConfig() {
