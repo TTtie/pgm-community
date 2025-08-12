@@ -32,15 +32,8 @@ import dev.pgm.community.utils.Sounds;
 import dev.pgm.community.utils.VisibilityUtils;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Queue;
-import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -345,6 +338,9 @@ public abstract class RequestFeatureBase extends FeatureBase implements RequestF
     MapPoolManager poolManager = getPoolManager();
     if (poolManager == null) return; // Cancel if pool manager not found
 
+    // Remove any offline sponsor requests before selection
+    removeOfflineSponsors();
+
     // Schedule the actual sponsoring for slightly after match end
     // This ensures if a restart, party start, or other sponsor-altering event is queued, it will
     // prevent
@@ -521,6 +517,21 @@ public abstract class RequestFeatureBase extends FeatureBase implements RequestF
   @Override
   public int queueIndex(SponsorRequest request) {
     return this.sponsor.getSponsorQueue().indexOf(request);
+  }
+
+  private void removeOfflineSponsors() {
+    Iterator<SponsorRequest> iterator = sponsor.getSponsorQueue().iterator();
+    while (iterator.hasNext()) {
+      SponsorRequest request = iterator.next();
+      Player player = Bukkit.getPlayer(request.getPlayerId());
+
+      if (player == null || !player.isOnline()) {
+        iterator.remove();
+
+        logger.info("Removed offline sponsor request:" + request.getPlayerId() + " for map "
+            + request.getMap().getName());
+      }
+    }
   }
 
   // --- Requests ---
