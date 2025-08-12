@@ -4,7 +4,6 @@ import static tc.oc.pgm.util.Assert.assertNotNull;
 
 import com.google.common.collect.Lists;
 import com.google.gson.Gson;
-import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import dev.pgm.community.Community;
 import java.io.BufferedReader;
@@ -13,12 +12,9 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import org.bukkit.Skin;
-import org.jetbrains.annotations.Nullable;
 
 public class WebUtils {
 
@@ -81,73 +77,6 @@ public class WebUtils {
       String sign = texture.get("raw").getAsJsonObject().get("signature").getAsString();
       return new Skin(data, sign);
     });
-  }
-
-  public static CompletableFuture<UsernameHistory> getUsernameHistory(String input) {
-    return getProfile(input).thenApplyAsync(UsernameHistory::of);
-  }
-
-  public static class UsernameHistory {
-    private String username;
-    private UUID playerId;
-    private List<NameEntry> history;
-
-    public static UsernameHistory of(JsonObject profile) {
-      String uuid = profile.get("uuid").getAsString();
-      String current = profile.get("username").getAsString();
-
-      List<NameEntry> history = Lists.newArrayList();
-      JsonArray names = profile.get("username_history").getAsJsonArray();
-      names.forEach(name -> {
-        if (name.isJsonObject() && name.getAsJsonObject().entrySet().size() > 1) {
-          history.add(new NameEntry(name.getAsJsonObject()));
-        }
-      });
-      return new UsernameHistory(current, UUID.fromString(uuid), history);
-    }
-
-    public UsernameHistory(String username, UUID playerId, List<NameEntry> history) {
-      this.username = username;
-      this.playerId = playerId;
-      this.history = history;
-    }
-
-    public String getCurrentName() {
-      return username;
-    }
-
-    public UUID getId() {
-      return playerId;
-    }
-
-    public List<NameEntry> getHistory() {
-      return history;
-    }
-  }
-
-  public static class NameEntry {
-    private String username;
-    private @Nullable Instant dateChanged;
-
-    public NameEntry(JsonObject name) {
-      this.username = name.get("username").getAsString();
-      String date = name.get("changed_at").getAsString();
-      this.dateChanged = Instant.parse(date);
-    }
-
-    public NameEntry(String username, Instant dateChanged) {
-      this.username = username;
-      this.dateChanged = dateChanged;
-    }
-
-    public String getUsername() {
-      return username;
-    }
-
-    @Nullable
-    public Instant getDateChanged() {
-      return dateChanged;
-    }
   }
 
   /** Get profile data of provided username/uuid * */

@@ -26,12 +26,7 @@ import dev.pgm.community.utils.PaginatedComponentResults;
 import dev.pgm.community.utils.VisibilityUtils;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import net.kyori.adventure.text.Component;
@@ -68,12 +63,9 @@ public class FriendshipCommand extends CommunityCommand {
   @Permission(CommunityPermissions.FRIENDSHIP)
   public void list(
       CommandAudience sender, Player player, @Argument("page") @Default("1") int page) {
-    friends
-        .getFriends(sender.getPlayer().getUniqueId())
-        .thenAcceptAsync(
-            frs -> {
-              sendFriendList(sender, frs, page);
-            });
+    friends.getFriends(sender.getPlayer().getUniqueId()).thenAcceptAsync(frs -> {
+      sendFriendList(sender, frs, page);
+    });
   }
 
   @Command("requests [page]")
@@ -81,12 +73,9 @@ public class FriendshipCommand extends CommunityCommand {
   @Permission(CommunityPermissions.FRIENDSHIP)
   public void requests(
       CommandAudience sender, Player player, @Argument("page") @Default("1") int page) {
-    friends
-        .getIncomingRequests(sender.getPlayer().getUniqueId())
-        .thenAcceptAsync(
-            requests -> {
-              sendRequestsList(sender, requests, page);
-            });
+    friends.getIncomingRequests(sender.getPlayer().getUniqueId()).thenAcceptAsync(requests -> {
+      sendRequestsList(sender, requests, page);
+    });
   }
 
   @Command("add <player>")
@@ -101,10 +90,9 @@ public class FriendshipCommand extends CommunityCommand {
       Component fancyName = PlayerComponent.player(nicked, NameStyle.FANCY);
 
       if (fake.hasRequest(fullName)) {
-        sender.sendWarning(
-            text("You have already sent a friend request to ")
-                .append(fancyName)
-                .color(NamedTextColor.GRAY));
+        sender.sendWarning(text("You have already sent a friend request to ")
+            .append(fancyName)
+            .color(NamedTextColor.GRAY));
         return;
       } else {
         fake.addRequest(fullName);
@@ -114,64 +102,55 @@ public class FriendshipCommand extends CommunityCommand {
       }
     }
 
-    getTarget(target.getIdentifier(), users)
-        .thenAcceptAsync(
-            storedId -> {
-              if (storedId.isPresent()) {
-                if (sender.getId().equals(storedId)) {
-                  sender.sendWarning(text("You may not friend yourself..."));
-                  return;
-                }
+    getTarget(target.getIdentifier(), users).thenAcceptAsync(storedId -> {
+      if (storedId.isPresent()) {
+        if (sender.getId().equals(storedId)) {
+          sender.sendWarning(text("You may not friend yourself..."));
+          return;
+        }
 
-                friends
-                    .addFriend(sender.getPlayer().getUniqueId(), storedId.get())
-                    .thenAcceptAsync(
-                        status -> {
-                          users
-                              .renderUsername(Optional.of(storedId.get()), NameStyle.FANCY)
-                              .thenAcceptAsync(
-                                  name -> {
-                                    switch (status) {
-                                      case ACCEPTED_EXISTING:
-                                        sender.sendMessage(
-                                            text("You accepted ")
-                                                .append(name)
-                                                .append(text("'s friend request!"))
-                                                .color(NamedTextColor.GREEN));
-                                        break;
-                                      case EXISTING:
-                                        if (friends
-                                            .areFriends(
-                                                sender.getPlayer().getUniqueId(), storedId.get())
-                                            .join()) {
-                                          sender.sendWarning(
-                                              text("You are already friends with ").append(name));
-                                        } else {
-                                          sender.sendWarning(
-                                              text("You have already sent a friend request to ")
-                                                  .append(name)
-                                                  .color(NamedTextColor.GRAY));
-                                        }
-                                        break;
-                                      case PENDING:
-                                        sender.sendMessage(
-                                            text("Friend request sent to ")
-                                                .append(name)
-                                                .color(NamedTextColor.GRAY));
-                                        break;
-                                      default:
-                                        sender.sendWarning(
-                                            text("Could not send a friend request to ")
-                                                .append(name)
-                                                .color(NamedTextColor.GRAY));
-                                        break;
-                                    }
-                                  });
-                        });
-              } else {
-                sender.sendWarning(formatNotFoundComponent(target.getIdentifier()));
-              }
+        friends
+            .addFriend(sender.getPlayer().getUniqueId(), storedId.get())
+            .thenAcceptAsync(status -> {
+              users
+                  .renderUsername(Optional.of(storedId.get()), NameStyle.FANCY)
+                  .thenAcceptAsync(name -> {
+                    switch (status) {
+                      case ACCEPTED_EXISTING:
+                        sender.sendMessage(text("You accepted ")
+                            .append(name)
+                            .append(text("'s friend request!"))
+                            .color(NamedTextColor.GREEN));
+                        break;
+                      case EXISTING:
+                        if (friends
+                            .areFriends(sender.getPlayer().getUniqueId(), storedId.get())
+                            .join()) {
+                          sender.sendWarning(
+                              text("You are already friends with ").append(name));
+                        } else {
+                          sender.sendWarning(text("You have already sent a friend request to ")
+                              .append(name)
+                              .color(NamedTextColor.GRAY));
+                        }
+                        break;
+                      case PENDING:
+                        sender.sendMessage(text("Friend request sent to ")
+                            .append(name)
+                            .color(NamedTextColor.GRAY));
+                        break;
+                      default:
+                        sender.sendWarning(text("Could not send a friend request to ")
+                            .append(name)
+                            .color(NamedTextColor.GRAY));
+                        break;
+                    }
+                  });
             });
+      } else {
+        sender.sendWarning(formatNotFoundComponent(target.getIdentifier()));
+      }
+    });
   }
 
   @Command("remove <player>")
@@ -179,43 +158,33 @@ public class FriendshipCommand extends CommunityCommand {
   @Permission(CommunityPermissions.FRIENDSHIP)
   public void remove(
       CommandAudience sender, Player player, @Argument("player") TargetPlayer target) {
-    getTarget(target.getIdentifier(), users)
-        .thenAcceptAsync(
-            storedId -> {
-              if (storedId.isPresent()) {
-                if (sender.getId().equals(storedId)) {
-                  sender.sendWarning(text("You may not unfriend yourself..."));
-                  return;
-                }
+    getTarget(target.getIdentifier(), users).thenAcceptAsync(storedId -> {
+      if (storedId.isPresent()) {
+        if (sender.getId().equals(storedId)) {
+          sender.sendWarning(text("You may not unfriend yourself..."));
+          return;
+        }
 
-                UUID targetId = storedId.get();
-                friends
-                    .getFriends(sender.getPlayer().getUniqueId())
-                    .thenAcceptAsync(
-                        friendList -> {
-                          Optional<Friendship> existing =
-                              friendList.stream().filter(fr -> fr.isInvolved(targetId)).findAny();
-                          users
-                              .renderUsername(storedId, NameStyle.FANCY)
-                              .thenAcceptAsync(
-                                  name -> {
-                                    if (existing.isPresent()) {
-                                      friends.rejectFriendship(existing.get());
-                                      sender.sendMessage(
-                                          text("You have removed ")
-                                              .append(name)
-                                              .append(text(" as a friend"))
-                                              .color(NamedTextColor.GRAY));
-                                    } else {
-                                      sender.sendWarning(
-                                          text("You are not friends with ").append(name));
-                                    }
-                                  });
-                        });
-              } else {
-                sender.sendWarning(formatNotFoundComponent(target.getIdentifier()));
-              }
-            });
+        UUID targetId = storedId.get();
+        friends.getFriends(sender.getPlayer().getUniqueId()).thenAcceptAsync(friendList -> {
+          Optional<Friendship> existing =
+              friendList.stream().filter(fr -> fr.isInvolved(targetId)).findAny();
+          users.renderUsername(storedId, NameStyle.FANCY).thenAcceptAsync(name -> {
+            if (existing.isPresent()) {
+              friends.rejectFriendship(existing.get());
+              sender.sendMessage(text("You have removed ")
+                  .append(name)
+                  .append(text(" as a friend"))
+                  .color(NamedTextColor.GRAY));
+            } else {
+              sender.sendWarning(text("You are not friends with ").append(name));
+            }
+          });
+        });
+      } else {
+        sender.sendWarning(formatNotFoundComponent(target.getIdentifier()));
+      }
+    });
   }
 
   @Command("accept <username>")
@@ -223,104 +192,83 @@ public class FriendshipCommand extends CommunityCommand {
   @Permission(CommunityPermissions.FRIENDSHIP)
   public void acceptRequest(
       CommandAudience sender, Player player, @Argument("username") String target) {
-    getTarget(target, users)
-        .thenAcceptAsync(
-            storedId -> {
-              if (storedId.isPresent()) {
-                List<Friendship> requests =
-                    friends.getIncomingRequests(sender.getPlayer().getUniqueId()).join();
-                if (requests.isEmpty()) {
-                  sender.sendWarning(text("You have no pending friend requests"));
-                  return;
-                }
+    getTarget(target, users).thenAcceptAsync(storedId -> {
+      if (storedId.isPresent()) {
+        List<Friendship> requests =
+            friends.getIncomingRequests(sender.getPlayer().getUniqueId()).join();
+        if (requests.isEmpty()) {
+          sender.sendWarning(text("You have no pending friend requests"));
+          return;
+        }
 
-                Optional<Friendship> pending =
-                    requests.stream()
-                        .filter(fr -> fr.getRequesterId().equals(storedId.get()))
-                        .findAny();
+        Optional<Friendship> pending = requests.stream()
+            .filter(fr -> fr.getRequesterId().equals(storedId.get()))
+            .findAny();
 
-                users
-                    .renderUsername(storedId, NameStyle.FANCY)
-                    .thenAcceptAsync(
-                        name -> {
-                          if (pending.isPresent()) {
-                            friends.acceptFriendship(pending.get());
-                            sender.sendMessage(
-                                text("You accepted ")
-                                    .append(name)
-                                    .append(text("'s friend request!"))
-                                    .color(NamedTextColor.GREEN));
+        users.renderUsername(storedId, NameStyle.FANCY).thenAcceptAsync(name -> {
+          if (pending.isPresent()) {
+            friends.acceptFriendship(pending.get());
+            sender.sendMessage(text("You accepted ")
+                .append(name)
+                .append(text("'s friend request!"))
+                .color(NamedTextColor.GREEN));
 
-                            // Notify online requester
-                            Player onlineFriend = Bukkit.getPlayer(storedId.get());
-                            if (onlineFriend != null
-                                && !VisibilityUtils.isDisguised(sender.getPlayer())) {
-                              Audience.get(onlineFriend)
-                                  .sendMessage(
-                                      text()
-                                          .append(sender.getStyledName())
-                                          .append(
-                                              text(
-                                                  " has accepted your friend request!",
-                                                  NamedTextColor.GREEN)));
-                            }
+            // Notify online requester
+            Player onlineFriend = Bukkit.getPlayer(storedId.get());
+            if (onlineFriend != null && !VisibilityUtils.isDisguised(sender.getPlayer())) {
+              Audience.get(onlineFriend)
+                  .sendMessage(text()
+                      .append(sender.getStyledName())
+                      .append(text(" has accepted your friend request!", NamedTextColor.GREEN)));
+            }
 
-                          } else {
-                            sender.sendWarning(
-                                text("You don't have a pending friend request from ")
-                                    .append(name)
-                                    .color(NamedTextColor.GRAY));
-                          }
-                        });
+          } else {
+            sender.sendWarning(text("You don't have a pending friend request from ")
+                .append(name)
+                .color(NamedTextColor.GRAY));
+          }
+        });
 
-              } else {
-                sender.sendWarning(formatNotFoundComponent(target));
-              }
-            });
+      } else {
+        sender.sendWarning(formatNotFoundComponent(target));
+      }
+    });
   }
 
   @Command("reject <player>")
   @Permission(CommunityPermissions.FRIENDSHIP)
   public void rejectRequest(
       CommandAudience sender, Player player, @Argument("player") TargetPlayer target) {
-    getTarget(target.getIdentifier(), users)
-        .thenAcceptAsync(
-            storedId -> {
-              if (storedId.isPresent()) {
-                List<Friendship> requests =
-                    friends.getIncomingRequests(sender.getPlayer().getUniqueId()).join();
-                if (requests.isEmpty()) {
-                  sender.sendWarning(text("You have no pending friend requests"));
-                  return;
-                }
+    getTarget(target.getIdentifier(), users).thenAcceptAsync(storedId -> {
+      if (storedId.isPresent()) {
+        List<Friendship> requests =
+            friends.getIncomingRequests(sender.getPlayer().getUniqueId()).join();
+        if (requests.isEmpty()) {
+          sender.sendWarning(text("You have no pending friend requests"));
+          return;
+        }
 
-                Optional<Friendship> pending =
-                    requests.stream()
-                        .filter(fr -> fr.getRequesterId().equals(storedId.get()))
-                        .findAny();
-                users
-                    .renderUsername(storedId, NameStyle.FANCY)
-                    .thenAcceptAsync(
-                        name -> {
-                          if (pending.isPresent()) {
-                            friends.rejectFriendship(pending.get());
-                            sender.sendMessage(
-                                text("You have rejected ")
-                                    .append(name)
-                                    .append(text("'s friend request"))
-                                    .color(NamedTextColor.GRAY));
-                            return;
-                          } else {
-                            sender.sendWarning(
-                                text("You don't have a pending friend request from ")
-                                    .append(name)
-                                    .color(NamedTextColor.GRAY));
-                          }
-                        });
-              } else {
-                sender.sendWarning(formatNotFoundComponent(target.getIdentifier()));
-              }
-            });
+        Optional<Friendship> pending = requests.stream()
+            .filter(fr -> fr.getRequesterId().equals(storedId.get()))
+            .findAny();
+        users.renderUsername(storedId, NameStyle.FANCY).thenAcceptAsync(name -> {
+          if (pending.isPresent()) {
+            friends.rejectFriendship(pending.get());
+            sender.sendMessage(text("You have rejected ")
+                .append(name)
+                .append(text("'s friend request"))
+                .color(NamedTextColor.GRAY));
+            return;
+          } else {
+            sender.sendWarning(text("You don't have a pending friend request from ")
+                .append(name)
+                .color(NamedTextColor.GRAY));
+          }
+        });
+      } else {
+        sender.sendWarning(formatNotFoundComponent(target.getIdentifier()));
+      }
+    });
   }
 
   private void sendRequestsList(CommandAudience audience, List<Friendship> requests, int page) {
@@ -334,35 +282,30 @@ public class FriendshipCommand extends CommunityCommand {
 
     NamedTextColor featureColor = NamedTextColor.YELLOW;
 
-    Component pageNum =
-        translatable(
-            "command.simplePageHeader",
-            NamedTextColor.GRAY,
-            text(Integer.toString(page), featureColor),
-            text(Integer.toString(pages), featureColor));
+    Component pageNum = translatable(
+        "command.simplePageHeader",
+        NamedTextColor.GRAY,
+        text(Integer.toString(page), featureColor),
+        text(Integer.toString(pages), featureColor));
 
-    Component header =
-        text("Friend Requests", featureColor)
-            .append(
-                text(" (")
-                    .append(headerResultCount)
-                    .append(text(") » "))
-                    .append(pageNum)
-                    .color(NamedTextColor.GRAY));
+    Component header = text("Friend Requests", featureColor)
+        .append(text(" (")
+            .append(headerResultCount)
+            .append(text(") » "))
+            .append(pageNum)
+            .color(NamedTextColor.GRAY));
 
-    Component formattedHeader =
-        TextFormatter.horizontalLineHeading(
-            audience.getSender(), header, NamedTextColor.DARK_GREEN);
+    Component formattedHeader = TextFormatter.horizontalLineHeading(
+        audience.getSender(), header, NamedTextColor.DARK_GREEN);
     new PaginatedComponentResults<Friendship>(formattedHeader, perPage) {
 
       @Override
       public Component format(Friendship data, int index) {
         // [Name] > [ time since requested ] [buttons to accept/reject]
-        Component name =
-            users
-                .renderUsername(
-                    data.getOtherPlayer(audience.getPlayer().getUniqueId()), NameStyle.FANCY)
-                .join();
+        Component name = users
+            .renderUsername(
+                data.getOtherPlayer(audience.getPlayer().getUniqueId()), NameStyle.FANCY)
+            .join();
 
         return text()
             .append(name)
@@ -386,89 +329,82 @@ public class FriendshipCommand extends CommunityCommand {
     }.display(audience.getAudience(), requests, page);
   }
 
-  private void sendFriendList(CommandAudience audience, List<Friendship> friends, int page) {
-    Collections.sort(
-        friends,
-        new Comparator<Friendship>() {
-          @Override
-          public int compare(Friendship o1, Friendship o2) {
-            UUID f1 = o1.getOtherPlayer(audience.getPlayer().getUniqueId());
-            UUID f2 = o2.getOtherPlayer(audience.getPlayer().getUniqueId());
+  private void sendFriendList(CommandAudience audience, List<Friendship> friendships, int page) {
+    UUID self = audience.getPlayer().getUniqueId();
+    boolean isStaff = audience.getSender().hasPermission(CommunityPermissions.STAFF);
 
-            UserProfile friend1 = users.getStoredProfile(f1).join();
-            UserProfile friend2 = users.getStoredProfile(f2).join();
+    record ResolvedFriend(
+        Friendship friendship, UUID uuid, UserProfile profile, Session session, boolean canSee) {}
 
-            boolean isStaff = audience.getSender().hasPermission(CommunityPermissions.STAFF);
-            Session session1 = friend1.getLatestSession(!isStaff).join();
-            Session session2 = friend2.getLatestSession(!isStaff).join();
+    List<CompletableFuture<ResolvedFriend>> futures = friendships.stream()
+        .map(friendship -> {
+          UUID other = friendship.getOtherPlayer(self);
+          if (other == null) return null;
 
-            Player online1 = Bukkit.getPlayer(f1);
-            Player online2 = Bukkit.getPlayer(f2);
+          return users.getStoredProfile(other).exceptionally(ex -> null).thenCompose(profile -> {
+            if (profile == null) return CompletableFuture.completedFuture(null);
+            return profile
+                .getLatestSession(!isStaff)
+                .exceptionally(ex -> null)
+                .thenApply(session -> {
+                  if (session == null) return null;
+                  boolean visible = canSee(Bukkit.getPlayer(other), audience);
+                  return new ResolvedFriend(friendship, other, profile, session, visible);
+                });
+          });
+        })
+        .filter(Objects::nonNull)
+        .toList();
 
-            boolean canSee1 = canSee(online1, audience);
-            boolean canSee2 = canSee(online2, audience);
+    CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
-            // Sort online friends before offline friends
-            if (canSee1 && !canSee2) {
-              return -1;
-            } else if (canSee2 && !canSee1) {
-              return 1;
-            }
+    List<ResolvedFriend> resolved = new ArrayList<>(
+        futures.stream().map(CompletableFuture::join).filter(Objects::nonNull).toList());
 
-            return -session1.getLatestUpdateDate().compareTo(session2.getLatestUpdateDate());
-          }
-        });
+    if (resolved.isEmpty()) return;
 
-    Component headerResultCount =
-        text(Integer.toString(friends.size()), NamedTextColor.LIGHT_PURPLE);
+    resolved.sort((a, b) -> {
+      if (a.canSee() && !b.canSee()) return -1;
+      if (b.canSee() && !a.canSee()) return 1;
+      return b.session().getLatestUpdateDate().compareTo(a.session().getLatestUpdateDate());
+    });
 
     int perPage = 10;
-    int pages = (friends.size() + perPage - 1) / perPage;
+    int pages = (resolved.size() + perPage - 1) / perPage;
     page = Math.max(1, Math.min(page, pages));
 
     NamedTextColor featureColor = NamedTextColor.DARK_PURPLE;
 
-    Component pageNum =
-        translatable(
+    Component header = text("Friends", featureColor)
+        .append(text(" ("))
+        .append(text(Integer.toString(resolved.size()), NamedTextColor.LIGHT_PURPLE))
+        .append(text(") » "))
+        .append(translatable(
             "command.simplePageHeader",
             NamedTextColor.GRAY,
             text(Integer.toString(page), featureColor),
-            text(Integer.toString(pages), featureColor));
+            text(Integer.toString(pages), featureColor)))
+        .color(NamedTextColor.GRAY);
 
-    Component header =
-        text("Friends", featureColor)
-            .append(text(" (").append(headerResultCount).append(text(") » ")).append(pageNum))
-            .color(NamedTextColor.GRAY);
+    Component formattedHeader = TextFormatter.horizontalLineHeading(
+        audience.getSender(), header, NamedTextColor.DARK_GREEN);
 
-    Component formattedHeader =
-        TextFormatter.horizontalLineHeading(
-            audience.getSender(), header, NamedTextColor.DARK_GREEN);
-    new PaginatedComponentResults<Friendship>(formattedHeader, perPage) {
+    new PaginatedComponentResults<ResolvedFriend>(formattedHeader, perPage) {
 
       @Override
-      public Component format(Friendship data, int index) {
-        Component name =
-            users
-                .renderUsername(
-                    data.getOtherPlayer(audience.getPlayer().getUniqueId()), NameStyle.FANCY)
-                .join();
+      public Component format(ResolvedFriend data, int index) {
+        Component name = users.renderUsername(data.uuid(), NameStyle.FANCY).join();
 
-        TextComponent.Builder builder =
-            text()
-                .append(name)
-                .append(space())
-                .append(BroadcastUtils.RIGHT_DIV.color(NamedTextColor.GOLD))
-                .append(
-                    renderOnlineStatus(
-                            data.getOtherPlayer(audience.getPlayer().getUniqueId()), audience)
-                        .join());
+        TextComponent.Builder builder = text()
+            .append(name)
+            .append(space())
+            .append(BroadcastUtils.RIGHT_DIV.color(NamedTextColor.GOLD))
+            .append(renderOnlineStatus(data.uuid(), audience).join());
 
-        if (data.getLastUpdated() != null) {
-          Component hover =
-              text("Friends for ", NamedTextColor.GRAY)
-                  .append(
-                      duration(Duration.between(data.getLastUpdated(), Instant.now()))
-                          .color(NamedTextColor.AQUA));
+        if (data.friendship().getLastUpdated() != null) {
+          Component hover = text("Friends for ", NamedTextColor.GRAY)
+              .append(duration(Duration.between(data.friendship().getLastUpdated(), Instant.now()))
+                  .color(NamedTextColor.AQUA));
           builder.hoverEvent(HoverEvent.showText(hover));
         }
 
@@ -477,37 +413,30 @@ public class FriendshipCommand extends CommunityCommand {
 
       @Override
       public Component formatEmpty() {
-        // TODO: Translate
         return text("You have no friends yet... :(", NamedTextColor.RED);
       }
-    }.display(audience.getAudience(), friends, page);
+    }.display(audience.getAudience(), resolved, page);
   }
 
   private CompletableFuture<Component> renderOnlineStatus(UUID playerId, CommandAudience viewer) {
     boolean staff = viewer.getSender().hasPermission(CommunityPermissions.STAFF);
     CompletableFuture<Component> future = new CompletableFuture<Component>();
-    users.findUserWithSession(
-        playerId,
-        !staff,
-        (profile, session) -> {
-          boolean online = !session.hasEnded();
-          boolean vanished = session.isDisguised();
-          boolean visible = online && (!vanished || staff);
+    users.findUserWithSession(playerId, !staff, (profile, session) -> {
+      boolean online = !session.hasEnded();
+      boolean vanished = session.isDisguised();
+      boolean visible = online && (!vanished || staff);
 
-          Component status =
-              (visible
-                      ? duration(Duration.between(session.getLatestUpdateDate(), Instant.now()))
-                      : relativePastApproximate(session.getLatestUpdateDate()))
-                  .color(visible ? NamedTextColor.GREEN : NamedTextColor.DARK_GREEN);
-          future.complete(
-              text(visible ? " Online for " : " Last seen ")
-                  .append(status)
-                  .append(text(session.isOnThisServer() ? "" : " on "))
-                  .append(
-                      text(session.isOnThisServer() ? "" : session.getServerName())
-                          .color(online ? NamedTextColor.GREEN : NamedTextColor.DARK_GREEN))
-                  .color(NamedTextColor.GRAY));
-        });
+      Component status = (visible
+              ? duration(Duration.between(session.getLatestUpdateDate(), Instant.now()))
+              : relativePastApproximate(session.getLatestUpdateDate()))
+          .color(visible ? NamedTextColor.GREEN : NamedTextColor.DARK_GREEN);
+      future.complete(text(visible ? " Online for " : " Last seen ")
+          .append(status)
+          .append(text(session.isOnThisServer() ? "" : " on "))
+          .append(text(session.isOnThisServer() ? "" : session.getServerName())
+              .color(online ? NamedTextColor.GREEN : NamedTextColor.DARK_GREEN))
+          .color(NamedTextColor.GRAY));
+    });
 
     return future;
   }
@@ -525,16 +454,14 @@ public class FriendshipCommand extends CommunityCommand {
     return true;
   }
 
-  private LoadingCache<UUID, FakeRequests> fakeRequests =
-      CacheBuilder.newBuilder()
-          .expireAfterAccess(3, TimeUnit.HOURS)
-          .build(
-              new CacheLoader<UUID, FakeRequests>() {
-                @Override
-                public FakeRequests load(UUID key) throws Exception {
-                  return new FakeRequests();
-                }
-              });
+  private LoadingCache<UUID, FakeRequests> fakeRequests = CacheBuilder.newBuilder()
+      .expireAfterAccess(3, TimeUnit.HOURS)
+      .build(new CacheLoader<UUID, FakeRequests>() {
+        @Override
+        public FakeRequests load(UUID key) throws Exception {
+          return new FakeRequests();
+        }
+      });
 
   private class FakeRequests {
 
