@@ -115,6 +115,42 @@ public class SQLModerationService extends SQLFeatureBase<Punishment, String>
     }
   }
 
+  public CompletableFuture<List<Punishment>> queryActiveForLogin(String target) {
+    UUID playerId = UUID.fromString(target);
+    return DB.getResultsAsync(SELECT_ACTIVE_PUNISHMENTS_QUERY, playerId.toString(), true)
+        .thenApplyAsync(results -> {
+          List<Punishment> activePunishments = Lists.newArrayList();
+          if (results != null && !results.isEmpty()) {
+            for (DbRow row : results) {
+              String id = row.getString("id");
+              String issuer = row.getString("issuer");
+              String reason = row.getString("reason");
+              String type = row.getString("type");
+              long time = DatabaseUtils.parseLong(row, "time");
+              long expires = DatabaseUtils.parseLong(row, "expires");
+              Duration length =
+                  Duration.between(Instant.ofEpochMilli(time), Instant.ofEpochMilli(expires));
+              boolean active = DatabaseUtils.parseBoolean(row, "active");
+              String punishmentService = row.getString("service");
+
+              activePunishments.add(Punishment.of(
+                  UUID.fromString(id),
+                  playerId,
+                  parseIssuer(issuer),
+                  reason,
+                  time,
+                  length,
+                  PunishmentType.valueOf(type.toUpperCase()),
+                  active,
+                  time,
+                  null,
+                  punishmentService));
+            }
+          }
+          return activePunishments;
+        });
+  }
+
   @Override // TODO: fetch single punishment
   public CompletableFuture<Punishment> query(String target) {
     return CompletableFuture.completedFuture(null);

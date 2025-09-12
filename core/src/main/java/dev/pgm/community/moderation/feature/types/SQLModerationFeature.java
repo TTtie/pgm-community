@@ -151,7 +151,7 @@ public class SQLModerationFeature extends ModerationFeatureBase {
     List<Punishment> punishments;
     try {
       punishments = service
-          .queryList(event.getUniqueId().toString())
+          .queryActiveForLogin(event.getUniqueId().toString())
           .get(getModerationConfig().getLoginTimeout(), TimeUnit.SECONDS);
 
       Optional<Punishment> ban = hasActiveBan(punishments);
@@ -218,7 +218,7 @@ public class SQLModerationFeature extends ModerationFeatureBase {
           public void run() {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null) {
-              service.queryList(playerId.toString()).thenAcceptAsync(punishments -> {
+              service.queryActiveForLogin(playerId.toString()).thenAcceptAsync(punishments -> {
                 Optional<Punishment> ban = hasActiveBan(punishments);
                 if (ban.isPresent()) {
                   Punishment punishment = ban.get();
