@@ -2,6 +2,7 @@ package dev.pgm.community.moderation.feature.types;
 
 import com.google.common.collect.Lists;
 import dev.pgm.community.Community;
+import dev.pgm.community.events.PlayerPardonEvent;
 import dev.pgm.community.moderation.ModerationConfig;
 import dev.pgm.community.moderation.feature.ModerationFeatureBase;
 import dev.pgm.community.moderation.punishments.Punishment;
@@ -10,6 +11,7 @@ import dev.pgm.community.moderation.punishments.types.MutePunishment;
 import dev.pgm.community.moderation.services.SQLModerationService;
 import dev.pgm.community.network.feature.NetworkFeature;
 import dev.pgm.community.users.feature.UsersFeature;
+import dev.pgm.community.utils.CommandAudience;
 import dev.pgm.community.utils.NameUtils;
 import java.time.Duration;
 import java.util.List;
@@ -91,19 +93,34 @@ public class SQLModerationFeature extends ModerationFeatureBase {
   }
 
   @Override
-  public CompletableFuture<Boolean> pardon(String target, @Nullable UUID issuer) {
+  public CompletableFuture<Boolean> pardon(String target, @Nullable CommandAudience issuer) {
     CompletableFuture<Optional<UUID>> playerId = NameUtils.isMinecraftName(target)
         ? getUsers().getStoredId(target)
         : CompletableFuture.completedFuture(Optional.of(UUID.fromString(target)));
-    return playerId.thenApplyAsync(uuid -> {
-      if (uuid.isPresent()) {
-        if (service.pardon(uuid.get(), issuer).join()) {
-          sendRefresh(uuid.get());
-          removeCachedBan(uuid.get());
-          return true;
-        }
-      }
-      return false;
+    return playerId.thenComposeAsync(uuid -> {
+      // Query active punishments first to know which types exist
+      return uuid.map(value -> service.queryList(value.toString()).thenComposeAsync(punishments -> {
+            List<PunishmentType> activeBanTypes = punishments.stream()
+                .filter(p -> p.isActive() && p.getType().isLoginPrevented())
+                .map(Punishment::getType)
+                .toList();
+
+            if (!activeBanTypes.isEmpty()) {
+              UUID issuerId = issuer != null ? issuer.getId().orElse(null) : null;
+              return service.pardon(value, issuerId).thenApplyAsync(success -> {
+                if (success) {
+                  for (PunishmentType type : activeBanTypes) {
+                    Community.get().callEvent(new PlayerPardonEvent(issuer, value, type));
+                  }
+                  sendRefresh(value);
+                  removeCachedBan(value);
+                }
+                return success;
+              });
+            }
+            return CompletableFuture.completedFuture(false);
+          }))
+          .orElseGet(() -> CompletableFuture.completedFuture(false));
     });
   }
 
@@ -276,9 +293,12 @@ public class SQLModerationFeature extends ModerationFeatureBase {
   }
 
   @Override
-  public CompletableFuture<Boolean> unmute(UUID id, @Nullable UUID issuer) {
-    return service.unmute(id, issuer).thenApplyAsync(success -> {
+  public CompletableFuture<Boolean> unmute(UUID id, @Nullable CommandAudience issuer) {
+    UUID issuerId = issuer != null ? issuer.getId().orElse(null) : null;
+    return service.unmute(id, issuerId).thenApplyAsync(success -> {
       if (success) {
+        // Fire pardon event before refresh
+        Community.get().callEvent(new PlayerPardonEvent(issuer, id, PunishmentType.MUTE));
         removeMute(id);
         sendRefresh(id); // Successful unmute will update other servers
       }

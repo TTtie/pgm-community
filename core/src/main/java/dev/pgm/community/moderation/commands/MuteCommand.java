@@ -49,90 +49,67 @@ public class MuteCommand extends CommunityCommand {
       @Argument("duration") Duration length,
       @Argument("reason") @FlagYielding String reason,
       @Flag(value = "silent", aliases = "s") boolean silent) {
-    getTarget(target.getIdentifier(), usernames)
-        .thenAccept(
-            id -> {
-              if (id.isPresent()) {
-                moderation.punish(
-                    PunishmentType.MUTE,
-                    id.get(),
-                    audience,
-                    reason,
-                    length,
-                    true,
-                    isDisguised(audience) || silent);
-              } else {
-                audience.sendWarning(formatNotFoundComponent(target.getIdentifier()));
-              }
-            });
+    getTarget(target.getIdentifier(), usernames).thenAccept(id -> {
+      if (id.isPresent()) {
+        moderation.punish(
+            PunishmentType.MUTE,
+            id.get(),
+            audience,
+            reason,
+            length,
+            true,
+            isDisguised(audience) || silent);
+      } else {
+        audience.sendWarning(formatNotFoundComponent(target.getIdentifier()));
+      }
+    });
   }
 
   @Command("unmute|um <target>")
   @CommandDescription("Unmute a player")
   @Permission(CommunityPermissions.MUTE)
   public void unMutePlayer(CommandAudience audience, @Argument("target") TargetPlayer target) {
-    getTarget(target.getIdentifier(), usernames)
-        .thenAccept(
-            id -> {
-              if (id.isPresent()) {
+    getTarget(target.getIdentifier(), usernames).thenAccept(id -> {
+      if (id.isPresent()) {
 
-                moderation
-                    .isMuted(id.get())
-                    .thenAcceptAsync(
-                        isMuted -> {
-                          usernames
-                              .renderUsername(id, NameStyle.FANCY)
-                              .thenAcceptAsync(
-                                  name -> {
-                                    if (isMuted.isPresent()) {
-                                      moderation
-                                          .unmute(id.get(), audience.getId().orElse(null))
-                                          .thenAcceptAsync(
-                                              pardon -> {
-                                                if (!pardon) {
-                                                  audience.sendWarning(
-                                                      text()
-                                                          .append(name)
-                                                          .append(
-                                                              text(
-                                                                  " could not be ",
-                                                                  NamedTextColor.GRAY))
-                                                          .append(text("unmuted"))
-                                                          .color(NamedTextColor.RED)
-                                                          .build());
-                                                } else {
-                                                  BroadcastUtils.sendAdminChatMessage(
-                                                      text()
-                                                          .append(name)
-                                                          .append(
-                                                              text(
-                                                                  " was unmuted by ",
-                                                                  NamedTextColor.GRAY))
-                                                          .append(audience.getStyledName())
-                                                          .build(),
-                                                      CommunityPermissions.MUTE);
+        moderation.isMuted(id.get()).thenAcceptAsync(isMuted -> {
+          usernames.renderUsername(id, NameStyle.FANCY).thenAcceptAsync(name -> {
+            if (isMuted.isPresent()) {
+              moderation.unmute(id.get(), audience).thenAcceptAsync(pardon -> {
+                if (!pardon) {
+                  audience.sendWarning(text()
+                      .append(name)
+                      .append(text(" could not be ", NamedTextColor.GRAY))
+                      .append(text("unmuted"))
+                      .color(NamedTextColor.RED)
+                      .build());
+                } else {
+                  BroadcastUtils.sendAdminChatMessage(
+                      text()
+                          .append(name)
+                          .append(text(" was unmuted by ", NamedTextColor.GRAY))
+                          .append(audience.getStyledName())
+                          .build(),
+                      CommunityPermissions.MUTE);
 
-                                                  Player online = Bukkit.getPlayer(id.get());
-                                                  if (online != null) {
-                                                    Audience.get(online)
-                                                        .sendWarning(
-                                                            translatable(
-                                                                "moderation.unmute.target",
-                                                                NamedTextColor.GREEN));
-                                                  }
-                                                }
-                                              });
-                                    } else {
-                                      audience.sendWarning(
-                                          text()
-                                              .append(name)
-                                              .append(text(" is not muted", NamedTextColor.GRAY))
-                                              .build());
-                                    }
-                                  });
-                        });
-              }
-            });
+                  Player online = Bukkit.getPlayer(id.get());
+                  if (online != null) {
+                    Audience.get(online)
+                        .sendWarning(
+                            translatable("moderation.unmute.target", NamedTextColor.GREEN));
+                  }
+                }
+              });
+            } else {
+              audience.sendWarning(text()
+                  .append(name)
+                  .append(text(" is not muted", NamedTextColor.GRAY))
+                  .build());
+            }
+          });
+        });
+      }
+    });
   }
 
   @Command("mutes")
@@ -141,10 +118,9 @@ public class MuteCommand extends CommunityCommand {
   public void listOnlineMuted(CommandAudience audience) {
     Set<Player> mutedPlayers = moderation.getOnlineMutes();
 
-    List<Component> onlineMutes =
-        mutedPlayers.stream()
-            .map(player -> PlayerComponent.player(player, NameStyle.FANCY))
-            .collect(Collectors.toList());
+    List<Component> onlineMutes = mutedPlayers.stream()
+        .map(player -> PlayerComponent.player(player, NameStyle.FANCY))
+        .collect(Collectors.toList());
 
     if (onlineMutes.isEmpty()) {
       audience.sendWarning(translatable("moderation.mute.none"));
@@ -152,12 +128,11 @@ public class MuteCommand extends CommunityCommand {
     }
 
     Component names = Component.join(text(", ", NamedTextColor.GRAY), onlineMutes);
-    Component message =
-        translatable("moderation.mute.list", NamedTextColor.GOLD)
-            .append(text("(", NamedTextColor.GRAY))
-            .append(text(Integer.toString(onlineMutes.size()), NamedTextColor.YELLOW))
-            .append(text("): ", NamedTextColor.GRAY))
-            .append(names);
+    Component message = translatable("moderation.mute.list", NamedTextColor.GOLD)
+        .append(text("(", NamedTextColor.GRAY))
+        .append(text(Integer.toString(onlineMutes.size()), NamedTextColor.YELLOW))
+        .append(text("): ", NamedTextColor.GRAY))
+        .append(names);
 
     audience.sendMessage(message);
   }
