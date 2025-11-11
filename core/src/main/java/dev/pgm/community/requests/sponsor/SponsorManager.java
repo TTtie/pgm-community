@@ -173,7 +173,9 @@ public class SponsorManager {
   }
 
   public List<MapInfo> getAvailableSponsorMaps() {
-    return Lists.newArrayList(PGM.get().getMapLibrary().getMaps()).stream()
+    return PGM.get()
+        .getMapLibrary()
+        .getMaps(/* query */ null)
         .filter(this::isMapSizeAllowed)
         .filter(m -> m.getPhase() == Phase.PRODUCTION)
         .filter(m -> !requests.hasMapCooldown(m))

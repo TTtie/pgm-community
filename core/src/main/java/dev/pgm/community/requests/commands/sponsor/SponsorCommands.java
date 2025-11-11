@@ -206,6 +206,11 @@ public class SponsorCommands extends CommunityCommand {
       @Flag(value = "name", aliases = "n") String name) {
     Stream<MapInfo> search = requests.getAvailableSponsorMaps().stream();
 
+    if (name != null) {
+      String query = StringUtils.normalize(name);
+      search = search.filter(map -> LiquidMetal.match(map.getNormalizedName(), query));
+    }
+
     if (!tags.isEmpty()) {
       final Map<Boolean, Set<String>> tagSet = tags.stream()
           .flatMap(t -> Arrays.stream(t.split(",")))
