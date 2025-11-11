@@ -336,7 +336,15 @@ public class FriendshipCommand extends CommunityCommand {
     record ResolvedFriend(
         Friendship friendship, UUID uuid, UserProfile profile, Session session, boolean canSee) {}
 
+    int perPage = 10;
+    int totalFriends = friendships.size();
+    int pages = Math.max(1, (totalFriends + perPage - 1) / perPage);
+    page = Math.max(1, Math.min(page, pages));
+
+    // Only query for friends on the current page
     List<CompletableFuture<ResolvedFriend>> futures = friendships.stream()
+        .skip((long) (page - 1) * perPage)
+        .limit(perPage)
         .map(friendship -> {
           UUID other = friendship.getOtherPlayer(self);
           if (other == null) return null;
@@ -369,15 +377,11 @@ public class FriendshipCommand extends CommunityCommand {
       return b.session().getLatestUpdateDate().compareTo(a.session().getLatestUpdateDate());
     });
 
-    int perPage = 10;
-    int pages = (resolved.size() + perPage - 1) / perPage;
-    page = Math.max(1, Math.min(page, pages));
-
     NamedTextColor featureColor = NamedTextColor.DARK_PURPLE;
 
     Component header = text("Friends", featureColor)
         .append(text(" ("))
-        .append(text(Integer.toString(resolved.size()), NamedTextColor.LIGHT_PURPLE))
+        .append(text(Integer.toString(totalFriends), NamedTextColor.LIGHT_PURPLE))
         .append(text(") » "))
         .append(translatable(
             "command.simplePageHeader",
