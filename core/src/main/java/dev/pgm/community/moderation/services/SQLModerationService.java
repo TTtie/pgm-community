@@ -53,7 +53,7 @@ public class SQLModerationService extends SQLFeatureBase<Punishment, String>
 
     DB.executeUpdateAsync(
         INSERT_PUNISHMENT_QUERY,
-        UUID.randomUUID().toString(),
+        punishment.getId().toString(),
         punishment.getTargetId().toString(),
         convertIssuer(punishment.getIssuerId()),
         punishment.getReason(),
