@@ -32,23 +32,20 @@ public class KickCommand extends CommunityCommand {
       CommandAudience audience,
       @Argument("target") TargetPlayer target,
       @Argument("reason") @FlagYielding String reason,
-      @Flag(value = "silent", aliases = "s") boolean silent,
-      @Flag(value = "off-record", aliases = "o") boolean offRecord) {
-    getTarget(target.getIdentifier(), usernames)
-        .thenAccept(
-            id -> {
-              if (id.isPresent()) {
-                moderation.punish(
-                    PunishmentType.KICK,
-                    id.get(),
-                    audience,
-                    reason,
-                    null,
-                    false,
-                    isDisguised(audience) || silent);
-              } else {
-                audience.sendWarning(formatNotFoundComponent(target.getIdentifier()));
-              }
-            });
+      @Flag(value = "silent", aliases = "s") boolean silent) {
+    getTarget(target.getIdentifier(), usernames).thenAccept(id -> {
+      if (id.isPresent()) {
+        moderation.punish(
+            PunishmentType.KICK,
+            id.get(),
+            audience,
+            reason,
+            null,
+            false,
+            isDisguised(audience) || silent);
+      } else {
+        audience.sendWarning(formatNotFoundComponent(target.getIdentifier()));
+      }
+    });
   }
 }
