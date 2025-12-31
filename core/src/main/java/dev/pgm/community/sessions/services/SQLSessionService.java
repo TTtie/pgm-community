@@ -5,6 +5,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import dev.pgm.community.Community;
+import dev.pgm.community.database.Query;
 import dev.pgm.community.feature.SQLFeatureBase;
 import dev.pgm.community.sessions.Session;
 import dev.pgm.community.sessions.SessionQuery;
@@ -32,6 +33,12 @@ public class SQLSessionService extends SQLFeatureBase<Session, SessionQuery>
   }
 
   @Override
+  public void createTable() {
+    super.createTable();
+    DB.executeUpdateAsync(Query.createTable(LATEST_TABLE_NAME, LATEST_TABLE_FIELDS));
+  }
+
+  @Override
   public void save(Session session) {
     SessionData query = sessionCache.getUnchecked(new SessionQuery(session.getPlayerId(), false));
     query.setSession(session);
@@ -47,6 +54,28 @@ public class SQLSessionService extends SQLFeatureBase<Session, SessionQuery>
         session.getServerName(),
         session.getStartDate().toEpochMilli(),
         session.getEndDate() == null ? null : session.getEndDate().toEpochMilli());
+
+    DB.executeUpdateAsync(
+        UPSERT_LATEST_SESSION_QUERY,
+        session.getPlayerId().toString(),
+        false,
+        session.getSessionId().toString(),
+        session.isDisguised(),
+        session.getServerName(),
+        session.getStartDate().toEpochMilli(),
+        session.getEndDate() == null ? null : session.getEndDate().toEpochMilli());
+
+    if (!session.isDisguised()) {
+      DB.executeUpdateAsync(
+          UPSERT_LATEST_SESSION_QUERY,
+          session.getPlayerId().toString(),
+          true,
+          session.getSessionId().toString(),
+          session.isDisguised(),
+          session.getServerName(),
+          session.getStartDate().toEpochMilli(),
+          session.getEndDate() == null ? null : session.getEndDate().toEpochMilli());
+    }
   }
 
   public void updateSessionEndTime(Session session) {
@@ -54,11 +83,19 @@ public class SQLSessionService extends SQLFeatureBase<Session, SessionQuery>
         UPDATE_SESSION_ENDTIME_QUERY,
         session.getEndDate() == null ? null : session.getEndDate().toEpochMilli(),
         session.getSessionId().toString());
+    DB.executeUpdateAsync(
+        UPDATE_LATEST_ENDTIME_QUERY,
+        session.getEndDate() == null ? null : session.getEndDate().toEpochMilli(),
+        session.getSessionId().toString());
   }
 
   public void endOngoingSessions() {
     DB.executeUpdateAsync(
         UPDATE_ONGOING_SESSION_ENDING_QUERY,
+        Instant.now().toEpochMilli(),
+        Community.get().getServerId());
+    DB.executeUpdateAsync(
+        UPDATE_LATEST_ONGOING_SESSION_ENDING_QUERY,
         Instant.now().toEpochMilli(),
         Community.get().getServerId());
   }
@@ -76,11 +113,12 @@ public class SQLSessionService extends SQLFeatureBase<Session, SessionQuery>
       return CompletableFuture.completedFuture(data.getSession());
     } else {
       return DB.getFirstRowAsync(
-              target.ignoreDisguised() ? SELECT_DISGUISED_SESSION_QUERY : SELECT_SESSION_QUERY,
-              target.getPlayerId().toString())
+              SELECT_LATEST_SESSION_QUERY,
+              target.getPlayerId().toString(),
+              target.ignoreDisguised())
           .thenApplyAsync(result -> {
             if (result != null) {
-              String id = result.getString("id");
+              String id = result.getString("session_id");
 
               String player = result.getString("player");
               boolean disguised = DatabaseUtils.parseBoolean(result, "disguised");
