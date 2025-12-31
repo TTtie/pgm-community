@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: checkout
         uses: actions/checkout@v4
@@ -32,4 +34,15 @@ jobs:
           name: Community.jar
           path: build/libs/Community.jar
           if-no-files-found: error
-
+      - name: release vars
+        if: github.repository == 'PGMDev/Community' && github.ref == 'refs/heads/dev'
+        run: echo "sha_short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+        id: release_vars
+      - name: release
+        if: github.repository == 'PGMDev/Community' && github.ref == 'refs/heads/dev'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dev-${{ steps.release_vars.outputs.sha_short }}
+          name: Dev build ${{ steps.release_vars.outputs.sha_short }}
+          prerelease: true
+          files: build/libs/Community.jar
