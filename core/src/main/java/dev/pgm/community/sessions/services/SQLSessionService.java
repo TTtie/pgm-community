@@ -100,6 +100,16 @@ public class SQLSessionService extends SQLFeatureBase<Session, SessionQuery>
         Community.get().getServerId());
   }
 
+  public void endOngoingSessionsSync() {
+    long now = Instant.now().toEpochMilli();
+    DB.executeUpdateAsync(
+            UPDATE_ONGOING_SESSION_ENDING_QUERY, now, Community.get().getServerId())
+        .join();
+    DB.executeUpdateAsync(
+            UPDATE_LATEST_ONGOING_SESSION_ENDING_QUERY, now, Community.get().getServerId())
+        .join();
+  }
+
   @Override
   public CompletableFuture<List<Session>> queryList(SessionQuery target) {
     return CompletableFuture.completedFuture(null);

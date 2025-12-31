@@ -17,4 +17,8 @@ public interface SessionFeature extends Feature {
   boolean isPlayerJoining(Player player);
 
   void endOngoingSessions();
+
+  default void endOngoingSessionsSync() {
+    endOngoingSessions();
+  }
 }

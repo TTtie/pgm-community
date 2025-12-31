@@ -43,9 +43,7 @@ public abstract class SessionFeatureBase extends FeatureBase implements SessionF
   @Override
   public void disable() {
     if (vanishedSessionListener != null) HandlerList.unregisterAll(vanishedSessionListener);
-
-    for (Player player : Bukkit.getOnlinePlayers())
-      getLatestSession(player.getUniqueId(), false).thenAcceptAsync(this::endSession);
+    endOngoingSessionsSync();
   }
 
   @EventHandler(priority = EventPriority.LOWEST)

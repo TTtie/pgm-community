@@ -337,14 +337,7 @@ public class FriendshipCommand extends CommunityCommand {
         Friendship friendship, UUID uuid, UserProfile profile, Session session, boolean canSee) {}
 
     int perPage = 10;
-    int totalFriends = friendships.size();
-    int pages = Math.max(1, (totalFriends + perPage - 1) / perPage);
-    page = Math.max(1, Math.min(page, pages));
-
-    // Only query for friends on the current page
     List<CompletableFuture<ResolvedFriend>> futures = friendships.stream()
-        .skip((long) (page - 1) * perPage)
-        .limit(perPage)
         .map(friendship -> {
           UUID other = friendship.getOtherPlayer(self);
           if (other == null) return null;
@@ -376,6 +369,10 @@ public class FriendshipCommand extends CommunityCommand {
       if (b.canSee() && !a.canSee()) return 1;
       return b.session().getLatestUpdateDate().compareTo(a.session().getLatestUpdateDate());
     });
+
+    int totalFriends = resolved.size();
+    int pages = Math.max(1, (totalFriends + perPage - 1) / perPage);
+    page = Math.max(1, Math.min(page, pages));
 
     NamedTextColor featureColor = NamedTextColor.DARK_PURPLE;
 

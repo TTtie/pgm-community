@@ -44,4 +44,9 @@ public class SQLSessionFeature extends SessionFeatureBase {
   public void endOngoingSessions() {
     service.endOngoingSessions();
   }
+
+  @Override
+  public void endOngoingSessionsSync() {
+    service.endOngoingSessionsSync();
+  }
 }
