@@ -1,4 +1,4 @@
-package dev.pgm.community.platform.modern.feature;
+package dev.pgm.community.platform.modern.feature.serverlinks;
 
 import static dev.pgm.community.util.Supports.Variant.PAPER;
 
