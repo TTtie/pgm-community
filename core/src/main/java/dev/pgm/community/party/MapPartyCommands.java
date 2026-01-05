@@ -42,6 +42,7 @@ public class MapPartyCommands extends CommunityCommand {
       new MapPartyMainMenu(party, sender);
     } else {
       if (isPartyMissing(viewer)) return;
+
       party.sendPartyWelcome(sender);
     }
   }
