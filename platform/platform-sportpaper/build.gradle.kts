@@ -2,6 +2,10 @@ plugins {
     id("buildlogic.java-conventions")
 }
 
+repositories {
+    maven("https://repo.viaversion.com") // ViaVersion
+}
+
 dependencies {
     implementation(project(":core"))
     implementation(project(":util"))
