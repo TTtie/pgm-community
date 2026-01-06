@@ -44,12 +44,9 @@ public class ServerLinksConfig extends FeatureConfigImpl {
     String customText = Objects.toString(configData.get(LINK_CUSTOM_TEXT_KEY), null);
     String uri = Objects.toString(configData.get(LINK_URI_KEY), null);
 
-    if (builtIn == null && customText == null) {
+    if ((builtIn == null) == (customText == null)) {
       throw new IllegalStateException(
           "A server link must have either built-in or custom text defined");
-    } else if (builtIn != null && customText != null) {
-      throw new IllegalStateException(
-          "A server link cannot have both built-in and custom text defined");
     }
 
     URI parsedUri = parseUri(uri);
