@@ -35,11 +35,6 @@ public class MapPartyBroadcastManager {
   public MapPartyBroadcastManager(MapPartyFeature feature) {
     this.feature = feature;
     this.config = feature.getEventConfig();
-    this.taskId =
-        Community.get()
-            .getServer()
-            .getScheduler()
-            .scheduleSyncRepeatingTask(Community.get(), this::checkTime, 20L, 20L);
   }
 
   private MapParty getParty() {
@@ -48,16 +43,19 @@ public class MapPartyBroadcastManager {
 
   public void enable() {
     this.parsePartyLines(feature.getParty());
+    if (!isEnabled()) {
+      disable();
+      return;
+    }
 
     if (taskId != -1) {
       disable();
     }
 
-    this.taskId =
-        Community.get()
-            .getServer()
-            .getScheduler()
-            .scheduleSyncRepeatingTask(Community.get(), this::checkTime, 20L, 20L);
+    this.taskId = Community.get()
+        .getServer()
+        .getScheduler()
+        .scheduleSyncRepeatingTask(Community.get(), this::checkTime, 20L, 20L);
   }
 
   public void disable() {
@@ -99,11 +97,11 @@ public class MapPartyBroadcastManager {
     MapParty party = feature.getParty();
     if (party == null) return;
     if (this.specficTimes == null || this.randomTimes == null) return;
-    this.checkSpecfics();
+    this.checkSpecifics();
     this.checkRandom();
   }
 
-  private void checkSpecfics() {
+  private void checkSpecifics() {
     for (EventBroadcastLine line : this.specficTimes) {
       if (line.getLastBroadcast() == null) {
         line.setLastBroadcast(Instant.now());
@@ -119,6 +117,9 @@ public class MapPartyBroadcastManager {
   private void checkRandom() {
     if (lastBroadcast == null) {
       lastBroadcast = Instant.now();
+      return;
+    }
+    if (randomTimes.isEmpty()) {
       return;
     }
     if (hasTimePassed(lastBroadcast, config.getBroadcastInterval())) {
@@ -195,10 +196,9 @@ public class MapPartyBroadcastManager {
     }
 
     public void broadcast() {
-      Builder broadcast =
-          text()
-              .append(text(colorize(config.getBroadcastPrefix())))
-              .append(text(feature.formatLine(getMessage(), getParty())));
+      Builder broadcast = text()
+          .append(text(colorize(config.getBroadcastPrefix())))
+          .append(text(feature.formatLine(getMessage(), getParty())));
 
       if (getCommand() != null) {
         broadcast.clickEvent(ClickEvent.runCommand(getCommand()));
@@ -212,5 +212,9 @@ public class MapPartyBroadcastManager {
 
       this.setLastBroadcast(Instant.now());
     }
+  }
+
+  public boolean isEnabled() {
+    return config.isBroadcastEnabled();
   }
 }

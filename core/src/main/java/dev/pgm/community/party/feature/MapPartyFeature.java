@@ -540,7 +540,9 @@ public class MapPartyFeature extends FeatureBase {
       MapPartyMessages.sendStartTitle(party);
     }
 
-    broadcasts.enable();
+    if (broadcasts.isEnabled()) {
+      broadcasts.enable();
+    }
   }
 
   @EventHandler
