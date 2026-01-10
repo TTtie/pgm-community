@@ -456,11 +456,12 @@ public class MapPartyFeature extends FeatureBase {
   }
 
   public void setAutoScale(CommandAudience sender, boolean autoscaling) {
-    party.setAutoScaling(autoscaling);
+    party.getSettings().getAutoscalingTeams().setValue(autoscaling);
 
+    boolean autoscaleEnabled = party.getSettings().getAutoscalingTeams().getValue();
     Component status = text(
-        party.shouldAutoScale() ? "enabled" : "disabled",
-        party.shouldAutoScale() ? NamedTextColor.GREEN : NamedTextColor.RED);
+        autoscaleEnabled ? "enabled" : "disabled",
+        autoscaleEnabled ? NamedTextColor.GREEN : NamedTextColor.RED);
 
     MapPartyMessages.broadcastHostAction(
         sender.getStyledName(),
@@ -533,7 +534,7 @@ public class MapPartyFeature extends FeatureBase {
         player(event.getSender(), NameStyle.FANCY),
         MapPartyMessages.getEventStatusAlert(party, MapPartyStatusType.START));
 
-    if (getEventConfig().showPartyNotifications()) {
+    if (party.getSettings().getShowPartyNotifications().getValue()) {
       BroadcastUtils.sendMultiLineGlobal(
           MapPartyMessages.getWelcome(event.getParty(), getEventConfig()));
       MapPartyMessages.sendStartTitle(party);
@@ -555,7 +556,8 @@ public class MapPartyFeature extends FeatureBase {
       this.raindropsEnabled = false;
     }
 
-    if (getEventConfig().showPartyNotifications() && event.getParty().isSetup()) {
+    if (party.getSettings().getShowPartyNotifications().getValue()
+        && event.getParty().isSetup()) {
       BroadcastUtils.sendMultiLineGlobal(
           MapPartyMessages.getGoodbye(event.getParty(), getEventConfig()));
     }
@@ -581,7 +583,7 @@ public class MapPartyFeature extends FeatureBase {
     if (party != null) {
       party.onLogin(event);
 
-      if (party.isRunning() && getEventConfig().showLoginMessage()) {
+      if (party.isRunning() && party.getSettings().getShowLoginMessage().getValue()) {
         Community.get()
             .getServer()
             .getScheduler()
@@ -644,7 +646,7 @@ public class MapPartyFeature extends FeatureBase {
 
   @EventHandler(priority = EventPriority.MONITOR)
   public void onMatchLoad(MatchAfterLoadEvent event) {
-    if (this.party != null && this.party.shouldAutoScale()) {
+    if (this.party != null && this.party.getSettings().getAutoscalingTeams().getValue()) {
       Match match = event.getMatch();
       double scale = match.getPlayers().size() / (double) match.getMaxPlayers();
 

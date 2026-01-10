@@ -27,7 +27,6 @@ public abstract class MapPartyBase implements MapParty {
   private MapPartySettings settings;
   private boolean running;
   private boolean setup;
-  private boolean autoScaling;
 
   private Instant startTime;
 
@@ -44,7 +43,6 @@ public abstract class MapPartyBase implements MapParty {
     this.settings = settings;
     this.running = false;
     this.setup = false;
-    this.autoScaling = true;
     this.startTime = null;
   }
 
@@ -72,16 +70,6 @@ public abstract class MapPartyBase implements MapParty {
   @Override
   public String getDescription() {
     return description;
-  }
-
-  @Override
-  public boolean shouldAutoScale() {
-    return autoScaling;
-  }
-
-  @Override
-  public void setAutoScaling(boolean autoScaling) {
-    this.autoScaling = autoScaling;
   }
 
   @Override

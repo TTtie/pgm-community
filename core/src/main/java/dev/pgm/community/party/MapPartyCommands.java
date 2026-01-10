@@ -179,9 +179,7 @@ public class MapPartyCommands extends CommunityCommand {
 
   @Command("history view <id>")
   @Permission(CommunityPermissions.PARTY)
-  public void historyView(
-      CommandAudience viewer,
-      @Argument("id") int id) {
+  public void historyView(CommandAudience viewer, @Argument("id") int id) {
     party.sendHistoryEntry(viewer, id, true);
   }
 
