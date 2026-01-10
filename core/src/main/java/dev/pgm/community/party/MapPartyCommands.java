@@ -181,8 +181,7 @@ public class MapPartyCommands extends CommunityCommand {
   @Permission(CommunityPermissions.PARTY)
   public void historyView(
       CommandAudience viewer,
-      @Argument("id") int id,
-      @Flag(value = "verbose", aliases = "v") boolean verbose) {
+      @Argument("id") int id) {
     party.sendHistoryEntry(viewer, id, true);
   }
 
