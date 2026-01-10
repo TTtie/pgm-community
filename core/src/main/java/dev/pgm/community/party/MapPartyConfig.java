@@ -165,6 +165,9 @@ public class MapPartyConfig extends FeatureConfigImpl {
   }
 
   private List<MapPartyPreset> parsePresets(ConfigurationSection section) {
+    if (section == null) {
+      return Lists.newArrayList();
+    }
     List<MapPartyPreset> presetList = Lists.newArrayList();
     for (String key : section.getKeys(false)) {
       presetList.add(MapPartyPreset.of(section.getConfigurationSection(key)));
@@ -174,8 +177,17 @@ public class MapPartyConfig extends FeatureConfigImpl {
 
   private Permission parsePermissions(List<String> permissions) {
     Map<String, Boolean> nodes = Maps.newHashMap();
+    if (permissions == null) {
+      permissions = Lists.newArrayList();
+    }
     for (String node : permissions) {
-      nodes.put(node, !node.startsWith("-"));
+      if (node == null) continue;
+      String trimmed = node.trim();
+      if (trimmed.isEmpty()) continue;
+      boolean negated = trimmed.startsWith("-");
+      String key = negated ? trimmed.substring(1).trim() : trimmed;
+      if (key.isEmpty()) continue;
+      nodes.put(key, !negated);
     }
     Permission permission =
         new Permission(CommunityPermissions.PARTY_HOST, PermissionDefault.FALSE, nodes);

@@ -298,8 +298,7 @@ party:
   motd-format: "&c&lCommunity\n&6» &a$name$ &6«"
   
   # Host Permissions - A list of extra permissions given to event hosts
-  host-permissions:
-    - ""
+  host-permissions: []
     
   # Event broadcasts - Automated broadcasts sent during map party  
   broadcasts:
