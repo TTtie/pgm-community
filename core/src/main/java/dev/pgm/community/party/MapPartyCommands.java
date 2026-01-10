@@ -49,16 +49,25 @@ public class MapPartyCommands extends CommunityCommand {
 
   @Command("create [type]")
   @Permission(CommunityPermissions.PARTY)
-  public void create(CommandAudience viewer, Player sender, @Argument("type") MapPartyType type) {
-    if (!party.create(viewer, sender, type)) {
-      viewer.sendWarning(MapPartyMessages.CREATION_ERROR);
+  public void create(
+      CommandAudience viewer,
+      Player sender,
+      @Argument("type") MapPartyType type,
+      @Flag(value = "force", aliases = "f") boolean force) {
+    if (!party.create(viewer, sender, type, force)) {
+      if (party.getParty() != null && party.getParty().isRunning()) {
+        viewer.sendWarning(MapPartyMessages.CREATION_ERROR);
+      }
     }
   }
 
   @Command("preset [name]")
   @Permission(CommunityPermissions.PARTY)
   public void createPreset(
-      CommandAudience viewer, Player sender, @Argument("name") @Greedy String presetName) {
+      CommandAudience viewer,
+      Player sender,
+      @Argument("name") @Greedy String presetName,
+      @Flag(value = "force", aliases = "f") boolean force) {
     if (party.getParty() != null) {
       viewer.sendWarning(MapPartyMessages.CREATION_ERROR);
       return;
@@ -69,7 +78,7 @@ public class MapPartyCommands extends CommunityCommand {
       viewer.sendWarning(MapPartyMessages.getUnknownPreset(presetName));
       return;
     }
-    party.create(viewer, sender, preset);
+    party.create(viewer, sender, preset, force);
   }
 
   @Command("start [delayed]")
@@ -157,6 +166,24 @@ public class MapPartyCommands extends CommunityCommand {
   public void maps(CommandAudience viewer, Player sender) {
     if (isPartyMissing(viewer)) return;
     new MapMenu(party, sender);
+  }
+
+  @Command("history [page]")
+  @Permission(CommunityPermissions.PARTY)
+  public void history(
+      CommandAudience viewer,
+      @Argument("page") @Default("1") int page,
+      @Flag(value = "verbose", aliases = "v") boolean verbose) {
+    party.sendHistory(viewer, page, verbose);
+  }
+
+  @Command("history view <id>")
+  @Permission(CommunityPermissions.PARTY)
+  public void historyView(
+      CommandAudience viewer,
+      @Argument("id") int id,
+      @Flag(value = "verbose", aliases = "v") boolean verbose) {
+    party.sendHistoryEntry(viewer, id, true);
   }
 
   @Command("hosts")

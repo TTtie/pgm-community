@@ -26,14 +26,19 @@ public class MapPartyTypeSelectionMenu extends MapPartyMenu {
 
     int index = 0;
     for (MapPartyType type : MapPartyType.values()) {
-      contents.set(
-          1,
-          SLOTS[index++],
-          ClickableItem.of(
-              getPartyItem(type),
-              c -> {
-                Bukkit.dispatchCommand(player, "event create " + type.name());
-              }));
+      contents.set(1, SLOTS[index++], ClickableItem.of(getPartyItem(type), c -> {
+        String command = "event create " + type.name();
+        if (getFeature().requiresForceForCreate()) {
+          new MapPartyCreateConfirmMenu(
+                  getFeature(),
+                  player,
+                  "event create --force " + type.name(),
+                  "&eCreate " + type.getName())
+              .open(this);
+        } else {
+          Bukkit.dispatchCommand(player, command);
+        }
+      }));
     }
     this.addBackButton(contents);
   }

@@ -226,7 +226,17 @@ public class MapPartyMainMenu extends MapPartyMenu {
             .lore(lore.toArray(new String[lore.size()]))
             .build(),
         c -> {
-          Bukkit.dispatchCommand(getViewer(), "event preset " + preset.getName());
+          String command = "event preset " + preset.getName();
+          if (getFeature().requiresForceForCreate()) {
+            new MapPartyCreateConfirmMenu(
+                    getFeature(),
+                    getViewer(),
+                    "event preset --force " + preset.getName(),
+                    preset.getName())
+                .open(this);
+          } else {
+            Bukkit.dispatchCommand(getViewer(), command);
+          }
         });
   }
 

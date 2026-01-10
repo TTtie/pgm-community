@@ -21,6 +21,8 @@ import dev.pgm.community.party.events.MapPartyEndEvent;
 import dev.pgm.community.party.events.MapPartyRestartEvent;
 import dev.pgm.community.party.events.MapPartyStartEvent;
 import dev.pgm.community.party.exceptions.MapPartySetupException;
+import dev.pgm.community.party.history.MapPartyHistoryEntry;
+import dev.pgm.community.party.history.MapPartyHistoryStore;
 import dev.pgm.community.party.menu.MapPartyMainMenu;
 import dev.pgm.community.party.presets.MapPartyPreset;
 import dev.pgm.community.party.types.CustomPoolParty;
@@ -28,6 +30,7 @@ import dev.pgm.community.party.types.RegularPoolParty;
 import dev.pgm.community.utils.BroadcastUtils;
 import dev.pgm.community.utils.CommandAudience;
 import dev.pgm.community.utils.PGMUtils;
+import dev.pgm.community.utils.PaginatedComponentResults;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -60,17 +63,20 @@ import tc.oc.pgm.util.Audience;
 import tc.oc.pgm.util.named.MapNameStyle;
 import tc.oc.pgm.util.named.NameStyle;
 import tc.oc.pgm.util.text.TextException;
+import tc.oc.pgm.util.text.TextFormatter;
 
 public class MapPartyFeature extends FeatureBase {
 
   private MapParty party; // Only 1 party at a time, for now
   private final MapPartyBroadcastManager broadcasts;
+  private final MapPartyHistoryStore historyStore;
 
   private boolean raindropsEnabled;
 
   public MapPartyFeature(Configuration config, Logger logger) {
     super(new MapPartyConfig(config), logger, "Map Party (PGM)");
     this.broadcasts = new MapPartyBroadcastManager(this);
+    this.historyStore = new MapPartyHistoryStore();
     this.raindropsEnabled = false;
 
     if (getConfig().isEnabled()) {
@@ -111,6 +117,14 @@ public class MapPartyFeature extends FeatureBase {
     return getEventConfig().getPresets();
   }
 
+  public boolean requiresForceForCreate() {
+    return getEventConfig().restrictSingleSession() && historyStore.hasAnyEndedEvents();
+  }
+
+  public Optional<MapPartyHistoryEntry> getMostRecentHistory() {
+    return historyStore.mostRecent();
+  }
+
   public MapPartyPreset getPreset(String presetName) {
     return getPresets().stream()
         .filter(preset -> cleanName(preset.getName()).equalsIgnoreCase(presetName))
@@ -122,10 +136,10 @@ public class MapPartyFeature extends FeatureBase {
     return ChatColor.stripColor(name);
   }
 
-  public void create(CommandAudience viewer, Player sender, MapPartyPreset preset) {
+  public void create(CommandAudience viewer, Player sender, MapPartyPreset preset, boolean force) {
     MapPartyType type = preset.getType();
 
-    if (!create(viewer, sender, type)) {
+    if (!create(viewer, sender, type, force)) {
       return;
     }
 
@@ -150,9 +164,16 @@ public class MapPartyFeature extends FeatureBase {
     }
   }
 
-  public boolean create(CommandAudience viewer, Player sender, MapPartyType type) {
+  public boolean create(CommandAudience viewer, Player sender, MapPartyType type, boolean force) {
     // Don't allow creation if an existing party is running
     if (party != null && party.isRunning()) {
+      return false;
+    }
+
+    if (getEventConfig().restrictSingleSession() && historyStore.hasAnyEndedEvents() && !force) {
+      historyStore.mostRecent().ifPresent(lastParty -> {
+        viewer.sendWarning(MapPartyMessages.getPreviousPartyWarning(lastParty));
+      });
       return false;
     }
 
@@ -167,7 +188,7 @@ public class MapPartyFeature extends FeatureBase {
         break;
       default:
         return false;
-        // Catch unknown party type
+      // Catch unknown party type
     }
 
     Community.get().callEvent(new MapPartyCreateEvent(party, sender));
@@ -491,6 +512,7 @@ public class MapPartyFeature extends FeatureBase {
 
   @EventHandler
   public void onPartyStart(MapPartyStartEvent event) {
+    historyStore.start(event.getParty());
     if (getEventConfig().isExtraServerEnabled()) {
       Bukkit.dispatchCommand(Bukkit.getConsoleSender(), getEventConfig().getOpenExtraCommand());
     }
@@ -522,6 +544,7 @@ public class MapPartyFeature extends FeatureBase {
 
   @EventHandler
   public void onPartyEnd(MapPartyEndEvent event) {
+    historyStore.end(event.getParty(), Instant.now());
     if (getEventConfig().isExtraServerEnabled()) {
       Bukkit.dispatchCommand(Bukkit.getConsoleSender(), getEventConfig().getCloseExtraCommand());
     }
@@ -547,6 +570,7 @@ public class MapPartyFeature extends FeatureBase {
 
   @EventHandler
   public void onPartyRestart(MapPartyRestartEvent event) {
+    historyStore.restart(event.getParty(), Instant.now());
     MapPartyMessages.broadcastHostAction(
         player(event.getSender(), NameStyle.FANCY),
         MapPartyMessages.getEventStatusAlert(party, MapPartyStatusType.RESTART));
@@ -599,6 +623,10 @@ public class MapPartyFeature extends FeatureBase {
 
   @EventHandler(priority = EventPriority.MONITOR)
   public void onMatchEnd(MatchFinishEvent event) {
+    if (this.party != null && this.party.isRunning()) {
+      historyStore.addMatch(event.getMatch());
+    }
+
     if (this.isStartQueued && party != null) {
       UUID mainHost = party.getHosts().getMainHostId();
       Player mainPlayerHost = Bukkit.getPlayer(mainHost);
@@ -636,5 +664,54 @@ public class MapPartyFeature extends FeatureBase {
         }
       }
     }
+  }
+
+  public void sendHistory(CommandAudience sender, int page, boolean verbose) {
+    List<MapPartyHistoryEntry> entries = historyStore.getEntriesDescending();
+    Component headerResultCount = text(Long.toString(entries.size()), NamedTextColor.DARK_GREEN);
+
+    int perPage = 7;
+    int pages = (entries.size() + perPage - 1) / perPage;
+    page = Math.max(1, Math.min(page, pages));
+
+    Component pageNum = text()
+        .append(text(page, NamedTextColor.YELLOW))
+        .append(text("/", NamedTextColor.GRAY))
+        .append(text(pages, NamedTextColor.YELLOW))
+        .build();
+
+    Component header = text()
+        .append(text("Party History", NamedTextColor.GREEN))
+        .append(text(" (", NamedTextColor.GRAY))
+        .append(headerResultCount)
+        .append(text(") >> ", NamedTextColor.GRAY))
+        .append(pageNum)
+        .build();
+
+    Component formattedHeader =
+        TextFormatter.horizontalLineHeading(sender.getSender(), header, NamedTextColor.DARK_GRAY);
+    new PaginatedComponentResults<MapPartyHistoryEntry>(formattedHeader, perPage) {
+      @Override
+      public Component format(MapPartyHistoryEntry data, int index) {
+        return data.format(verbose);
+      }
+
+      @Override
+      public Component formatEmpty() {
+        return text("No recent map party events found!", NamedTextColor.RED);
+      }
+    }.display(sender.getAudience(), entries, page);
+  }
+
+  public void sendHistoryEntry(CommandAudience sender, int sequence, boolean verbose) {
+    historyStore
+        .getBySequence(sequence)
+        .ifPresentOrElse(
+            entry -> {
+              sender.getAudience().sendMessage(entry.format(verbose));
+            },
+            () -> sender
+                .getAudience()
+                .sendWarning(text("No party history found for #" + sequence, NamedTextColor.RED)));
   }
 }

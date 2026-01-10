@@ -101,7 +101,7 @@ public class CustomPoolParty extends MapPartyBase {
 
   private void setMapPool(CommandSender sender) throws MapPartySetupException {
     if (getMaps().isEmpty()) {
-      throw new MapPartySetupException("No maps defined! Use &e/party addmap [map]", this);
+      throw new MapPartySetupException("No maps defined! Use /event addmap [map]", this);
     }
 
     MapPoolManager manager = PGMUtils.getMapPoolManager();
@@ -111,27 +111,18 @@ public class CustomPoolParty extends MapPartyBase {
 
     MapPool customPool;
     if (isVoted()) {
-      customPool =
-          new VotingPool(
-              MapPoolType.VOTED,
-              manager,
-              this.getName(),
-              true,
-              1,
-              false,
-              Duration.ofSeconds(30),
-              maps);
+      customPool = new VotingPool(
+          MapPoolType.VOTED, manager, this.getName(), true, 1, false, Duration.ofSeconds(30), maps);
     } else {
-      customPool =
-          new Rotation(
-              MapPoolType.ORDERED,
-              manager,
-              this.getName(),
-              true,
-              1,
-              false,
-              Duration.ofSeconds(30),
-              maps);
+      customPool = new Rotation(
+          MapPoolType.ORDERED,
+          manager,
+          this.getName(),
+          true,
+          1,
+          false,
+          Duration.ofSeconds(30),
+          maps);
     }
 
     PGMUtils.setMapPool(sender, customPool);

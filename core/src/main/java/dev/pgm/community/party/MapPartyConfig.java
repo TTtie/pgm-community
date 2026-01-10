@@ -47,6 +47,7 @@ public class MapPartyConfig extends FeatureConfigImpl {
   // Default Party Settings
   private boolean showLoginMessage;
   private boolean showPartyNotifications;
+  private boolean restrictSingleSession;
 
   // Custom MOTD
   private String motdFormat;
@@ -72,6 +73,10 @@ public class MapPartyConfig extends FeatureConfigImpl {
 
   public boolean showPartyNotifications() {
     return showPartyNotifications;
+  }
+
+  public boolean restrictSingleSession() {
+    return restrictSingleSession;
   }
 
   public String getWelcomeLine() {
@@ -141,6 +146,7 @@ public class MapPartyConfig extends FeatureConfigImpl {
     this.presets = parsePresets(config.getConfigurationSection(KEY + ".presets"));
     this.showLoginMessage = config.getBoolean(KEY + ".settings.login-message");
     this.showPartyNotifications = config.getBoolean(KEY + ".settings.party-notifications");
+    this.restrictSingleSession = config.getBoolean(KEY + ".settings.single-event");
     this.welcomeLine = config.getString(KEY + ".welcome.line");
     this.welcomeHover = config.getString(KEY + ".welcome.hover");
     this.welcomeCommand = config.getString(KEY + ".welcome.command");

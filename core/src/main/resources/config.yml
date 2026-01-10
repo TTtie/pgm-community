@@ -268,6 +268,7 @@ party:
   settings:
     login-message: true # If a login message should be sent to notify new players of party
     party-notifications: true # If a title and chat message should be sent when party starts/stops
+    single-event: true # If only one map party is allowed per day (use --force to override)
     raindrop-activate: "rdm set 1.5" # Command used to enable raindrop multiplier
     raindrop-deactivate: "rdm clear" # Command used to disable raindrop multiplier
 

@@ -57,7 +57,7 @@ public class RegularPoolParty extends MapPartyBase {
   @Override
   public void setup(CommandSender sender) throws MapPartySetupException {
     if (pool == null) {
-      throw new MapPartySetupException("No map pool defined! Use &e/party setpool [pool]", this);
+      throw new MapPartySetupException("No map pool defined! Use /event setpool [pool]", this);
     }
     PGMUtils.setMapPool(sender, pool);
   }

@@ -5,9 +5,11 @@ import static net.kyori.adventure.text.Component.text;
 import static tc.oc.pgm.util.bukkit.BukkitUtils.colorize;
 import static tc.oc.pgm.util.player.PlayerComponent.player;
 import static tc.oc.pgm.util.text.TemporalComponent.duration;
+import static tc.oc.pgm.util.text.TemporalComponent.relativePastApproximate;
 
 import com.google.common.collect.Lists;
 import dev.pgm.community.CommunityPermissions;
+import dev.pgm.community.party.history.MapPartyHistoryEntry;
 import dev.pgm.community.utils.BroadcastUtils;
 import dev.pgm.community.utils.MessageUtils;
 import java.time.Duration;
@@ -38,6 +40,24 @@ public class MapPartyMessages {
 
   public static final Component RESTART_ERROR =
       text("Unable to restart map party.", NamedTextColor.RED);
+
+  public static Component getPreviousPartyWarning(MapPartyHistoryEntry lastParty) {
+    Component timeSince = relativePastApproximate(lastParty.getEndTime());
+    Component partyName = lastParty
+        .getStyledName()
+        .hoverEvent(HoverEvent.showText(text()
+            .append(text("Click to view details of ", NamedTextColor.GRAY))
+            .append(lastParty.getStyledName())
+            .build()))
+        .clickEvent(ClickEvent.runCommand("/event history view " + lastParty.getSequence()));
+    return text()
+        .append(partyName)
+        .append(text(" ended ", NamedTextColor.GRAY))
+        .append(timeSince.color(NamedTextColor.YELLOW))
+        .append(text(". Are you sure you want to start another event? ", NamedTextColor.GRAY))
+        .append(text("Use --force to proceed.", NamedTextColor.RED))
+        .build();
+  }
 
   public static final Component USE_SETPOOL_ERROR =
       text("Unable to set map pool while map party is active!", NamedTextColor.RED);
