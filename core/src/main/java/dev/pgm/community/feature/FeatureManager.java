@@ -2,6 +2,7 @@ package dev.pgm.community.feature;
 
 import dev.pgm.community.assistance.feature.AssistanceFeature;
 import dev.pgm.community.assistance.feature.types.SQLAssistanceFeature;
+import dev.pgm.community.audit.CommandAuditFeature;
 import dev.pgm.community.broadcast.BroadcastFeature;
 import dev.pgm.community.chat.management.ChatManagementFeature;
 import dev.pgm.community.chat.network.NetworkChatFeature;
@@ -55,6 +56,7 @@ public class FeatureManager {
   private final FreezeFeature freeze;
   private final MutationFeature mutation;
   private final BroadcastFeature broadcast;
+  private final CommandAuditFeature commandAudit;
   private final MobFeature mob;
   private final MapPartyFeature party;
   private final PollFeature polls;
@@ -91,6 +93,7 @@ public class FeatureManager {
     this.freeze = new FreezeFeature(config, logger);
     this.mutation = new MutationFeature(config, logger, inventory);
     this.broadcast = new BroadcastFeature(config, logger);
+    this.commandAudit = new CommandAuditFeature(config, logger);
     this.chatNetwork = new NetworkChatFeature(config, logger, network);
     this.mob = new MobFeature(config, logger);
     this.party = new MapPartyFeature(config, logger);
@@ -151,6 +154,10 @@ public class FeatureManager {
     return broadcast;
   }
 
+  public CommandAuditFeature getCommandAudit() {
+    return commandAudit;
+  }
+
   public NetworkChatFeature getNetworkChat() {
     return chatNetwork;
   }
@@ -193,6 +200,7 @@ public class FeatureManager {
     getMutations().getConfig().reload(config);
     getBroadcast().getConfig().reload(config);
     getNick().getConfig().reload(config);
+    getCommandAudit().getConfig().reload(config);
     getNetworkChat().getConfig().reload(config);
     getRequests().getConfig().reload(config);
     getMobs().getConfig().reload(config);
@@ -219,6 +227,7 @@ public class FeatureManager {
     if (getMutations().isEnabled()) getMutations().disable();
     if (getBroadcast().isEnabled()) getBroadcast().disable();
     if (getNick().isEnabled()) getNick().disable();
+    if (getCommandAudit().isEnabled()) getCommandAudit().disable();
     if (getNetworkChat().isEnabled()) getNetworkChat().disable();
     if (getRequests().isEnabled()) getRequests().disable();
     if (getMobs().isEnabled()) getMobs().disable();

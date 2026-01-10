@@ -218,6 +218,27 @@ broadcast:
       - "&3This is an alert, you can adjust the messages inside of &aconfig.yml"
       - "&a&lYou can use &b&lcolor &4&lcodes &6&ltoo!"    
 
+# Command Audit - Broadcast staff actions to admin chat
+command-audit:
+  enabled: true
+  audit-permissions: # Only audit commands from players with one of these permissions
+    - "community.staff"
+  exempt-permissions: # Skip auditing when a player has any of these permissions
+    - "community.command-audit.exempt"
+  click-teleport: true # Allow clicking the alert to teleport to the command location
+  include-prefixes: # Prefixes to always audit (matches the start of the full command)
+    - "//"
+    - "/worldedit:"
+    - "/minecraft:"
+  include-permissions: # Command permission nodes that include any of these strings will be audited
+    - "worldedit"
+  include-commands: # Commands to audit (matches the start of the full command)
+    - "/summon"
+    - "/enchant"
+  exclude-commands: # Commands to ignore (matches the start of the full command)
+    - "/sudo"
+    - "/community:sudo"
+
 # Freeze - Freeze players via command or observer hotbar tool (when PGM is enabled)  
 freeze:
   enabled: true  
