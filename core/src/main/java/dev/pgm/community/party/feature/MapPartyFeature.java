@@ -275,6 +275,11 @@ public class MapPartyFeature extends FeatureBase {
           viewer.getStyledName(),
           text("set the party map pool to"),
           text(mapPool.get().getName(), NamedTextColor.AQUA));
+    } else {
+      viewer.sendWarning(text()
+          .append(text(pool, NamedTextColor.DARK_AQUA))
+          .append(text(" is not a valid map pool", NamedTextColor.RED))
+          .build());
     }
   }
 
