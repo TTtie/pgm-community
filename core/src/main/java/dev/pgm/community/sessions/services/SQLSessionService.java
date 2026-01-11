@@ -10,6 +10,7 @@ import dev.pgm.community.feature.SQLFeatureBase;
 import dev.pgm.community.sessions.Session;
 import dev.pgm.community.sessions.SessionQuery;
 import dev.pgm.community.utils.DatabaseUtils;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -102,12 +103,15 @@ public class SQLSessionService extends SQLFeatureBase<Session, SessionQuery>
 
   public void endOngoingSessionsSync() {
     long now = Instant.now().toEpochMilli();
-    DB.executeUpdateAsync(
-            UPDATE_ONGOING_SESSION_ENDING_QUERY, now, Community.get().getServerId())
-        .join();
-    DB.executeUpdateAsync(
-            UPDATE_LATEST_ONGOING_SESSION_ENDING_QUERY, now, Community.get().getServerId())
-        .join();
+    try {
+      DB.executeUpdate(UPDATE_ONGOING_SESSION_ENDING_QUERY, now, Community.get().getServerId());
+      DB.executeUpdate(
+          UPDATE_LATEST_ONGOING_SESSION_ENDING_QUERY, now, Community.get().getServerId());
+    } catch (SQLException exception) {
+      Community.get()
+          .getLogger()
+          .warning("Failed to end ongoing sessions during shutdown: " + exception.getMessage());
+    }
   }
 
   @Override
