@@ -1,6 +1,8 @@
 package dev.pgm.community.moderation.feature;
 
+import com.google.common.cache.Cache;
 import dev.pgm.community.feature.Feature;
+import dev.pgm.community.moderation.ModerationConfig;
 import dev.pgm.community.moderation.feature.loggers.BlockGlitchLogger;
 import dev.pgm.community.moderation.punishments.NetworkPunishment;
 import dev.pgm.community.moderation.punishments.Punishment;
@@ -128,6 +130,11 @@ public interface ModerationFeature extends Feature {
   Optional<Punishment> getLastPunishment(UUID issuer);
 
   Optional<MutePunishment> getCachedMute(UUID playerId);
+
+  ModerationConfig getModerationConfig();
+
+  @Nullable
+  Cache<UUID, Punishment> getMatchBans();
 
   // AsyncPlayerPreLoginEvent handler
   void onPreLogin(AsyncPlayerPreLoginEvent event);

@@ -1,4 +1,4 @@
-package dev.pgm.community.nick.feature;
+package dev.pgm.community.nick.feature.types;
 
 import static net.kyori.adventure.text.Component.empty;
 import static net.kyori.adventure.text.Component.text;
@@ -13,7 +13,11 @@ import dev.pgm.community.feature.FeatureBase;
 import dev.pgm.community.nick.Nick;
 import dev.pgm.community.nick.NickConfig;
 import dev.pgm.community.nick.data.NickSelection;
+import dev.pgm.community.nick.feature.NickFeature;
+import dev.pgm.community.nick.feature.PGMNickIntegration;
 import dev.pgm.community.nick.skin.SkinManager;
+import dev.pgm.community.nick.store.NickStore;
+import dev.pgm.community.users.feature.UsersFeature;
 import dev.pgm.community.utils.PGMUtils;
 import dev.pgm.community.utils.WebUtils;
 import java.util.List;
@@ -41,24 +45,27 @@ import org.jetbrains.annotations.Nullable;
 import tc.oc.pgm.util.Audience;
 import tc.oc.pgm.util.text.TextFormatter;
 
-public abstract class NickFeatureBase extends FeatureBase implements NickFeature {
+public class NickFeatureCore extends FeatureBase implements NickFeature {
 
-  private @Nullable PGMNickIntegration pgmNicks;
+  private final NickStore store;
+  private final UsersFeature users;
   private final Map<UUID, String> nickedPlayers;
   private final Cache<UUID, String> loginSubdomains;
   private final List<UUID> autoNicked;
   private final SkinManager skins;
+  private final Cache<UUID, NickSelection> nickChoices;
 
-  private Cache<UUID, NickSelection> nickChoices;
+  private @Nullable PGMNickIntegration pgmNicks;
 
-  public NickFeatureBase(Configuration config, Logger logger, String featureName) {
-    super(new NickConfig(config), logger, featureName);
+  public NickFeatureCore(Configuration config, Logger logger, UsersFeature users, NickStore store) {
+    super(new NickConfig(config), logger, "Nicknames");
+    this.store = store;
+    this.users = users;
     this.nickedPlayers = Maps.newHashMap();
     this.loginSubdomains =
         CacheBuilder.newBuilder().expireAfterAccess(30, TimeUnit.SECONDS).build();
     this.autoNicked = Lists.newArrayList();
     this.skins = new SkinManager();
-
     this.nickChoices =
         CacheBuilder.newBuilder().expireAfterWrite(1, TimeUnit.HOURS).build();
 
@@ -238,6 +245,72 @@ public abstract class NickFeatureBase extends FeatureBase implements NickFeature
     } else {
       nickedPlayers.remove(event.getUniqueId());
     }
+  }
+
+  @Override
+  public CompletableFuture<Nick> getNick(UUID playerId) {
+    return store.query(playerId.toString());
+  }
+
+  @Override
+  public CompletableFuture<Boolean> setNick(UUID playerId, String nickName) {
+    return isNameAvailable(nickName).thenApplyAsync(free -> {
+      boolean override = Bukkit.getPlayer(playerId) != null
+          && Bukkit.getPlayer(playerId).hasPermission(CommunityPermissions.ADMIN);
+      if (!free && !override) {
+        return false;
+      }
+
+      getNick(playerId).thenAcceptAsync(nick -> {
+        if (nick == null) {
+          Nick newNick = Nick.of(playerId, nickName);
+          store.save(newNick);
+        } else {
+          nick.setName(nickName);
+          store.update(nick);
+        }
+      });
+      return true;
+    });
+  }
+
+  @Override
+  public CompletableFuture<Boolean> clearNick(UUID playerId) {
+    return getNick(playerId).thenApplyAsync(nick -> {
+      if (nick == null) return false;
+      nick.clear();
+      store.update(nick);
+      return true;
+    });
+  }
+
+  @Override
+  public CompletableFuture<Boolean> isNameAvailable(String nickName) {
+    return store.isNameAvailable(nickName).thenApplyAsync(available -> {
+      return available && users.getStoredProfile(nickName).join() == null;
+    });
+  }
+
+  @Override
+  public CompletableFuture<Boolean> toggleNickStatus(UUID playerId) {
+    return getNick(playerId).thenApplyAsync(nick -> {
+      if (nick == null) return false;
+
+      nick.setEnabled(!nick.isEnabled());
+      store.update(nick);
+      return nick.isEnabled();
+    });
+  }
+
+  @Override
+  public CompletableFuture<Boolean> setNickStatus(UUID playerId, boolean enabled) {
+    return getNick(playerId).thenApplyAsync(nick -> {
+      if (nick == null) return false;
+
+      nick.setEnabled(enabled);
+      store.update(nick);
+      return nick.isEnabled();
+    });
   }
 
   private boolean isPGMEnabled() {

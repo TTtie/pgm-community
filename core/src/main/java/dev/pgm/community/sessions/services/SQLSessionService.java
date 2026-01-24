@@ -1,16 +1,14 @@
 package dev.pgm.community.sessions.services;
 
-import co.aikar.idb.DB;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import dev.pgm.community.Community;
+import dev.pgm.community.database.DatabaseExecutor;
 import dev.pgm.community.database.Query;
 import dev.pgm.community.feature.SQLFeatureBase;
 import dev.pgm.community.sessions.Session;
 import dev.pgm.community.sessions.SessionQuery;
-import dev.pgm.community.utils.DatabaseUtils;
-import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -21,6 +19,7 @@ public class SQLSessionService extends SQLFeatureBase<Session, SessionQuery>
     implements SessionDataQuery {
 
   private final LoadingCache<SessionQuery, SessionData> sessionCache;
+  private final String upsertLatestSessionQuery;
 
   public SQLSessionService() {
     super(TABLE_NAME, TABLE_FIELDS);
@@ -31,12 +30,13 @@ public class SQLSessionService extends SQLFeatureBase<Session, SessionQuery>
             return new SessionData(key.getPlayerId(), key.ignoreDisguised());
           }
         });
+    this.upsertLatestSessionQuery = DatabaseExecutor.getDialect().upsertLatestSessionQuery();
   }
 
   @Override
   public void createTable() {
     super.createTable();
-    DB.executeUpdateAsync(Query.createTable(LATEST_TABLE_NAME, LATEST_TABLE_FIELDS));
+    DatabaseExecutor.executeUpdateAsync(Query.createTable(LATEST_TABLE_NAME, LATEST_TABLE_FIELDS));
   }
 
   @Override
@@ -47,7 +47,7 @@ public class SQLSessionService extends SQLFeatureBase<Session, SessionQuery>
     query = sessionCache.getUnchecked(new SessionQuery(session.getPlayerId(), true));
     query.invalidate();
 
-    DB.executeUpdateAsync(
+    DatabaseExecutor.executeUpdateAsync(
         INSERT_SESSION_QUERY,
         session.getSessionId().toString(),
         session.getPlayerId().toString(),
@@ -56,8 +56,8 @@ public class SQLSessionService extends SQLFeatureBase<Session, SessionQuery>
         session.getStartDate().toEpochMilli(),
         session.getEndDate() == null ? null : session.getEndDate().toEpochMilli());
 
-    DB.executeUpdateAsync(
-        UPSERT_LATEST_SESSION_QUERY,
+    DatabaseExecutor.executeUpdateAsync(
+        upsertLatestSessionQuery,
         session.getPlayerId().toString(),
         false,
         session.getSessionId().toString(),
@@ -67,8 +67,8 @@ public class SQLSessionService extends SQLFeatureBase<Session, SessionQuery>
         session.getEndDate() == null ? null : session.getEndDate().toEpochMilli());
 
     if (!session.isDisguised()) {
-      DB.executeUpdateAsync(
-          UPSERT_LATEST_SESSION_QUERY,
+      DatabaseExecutor.executeUpdateAsync(
+          upsertLatestSessionQuery,
           session.getPlayerId().toString(),
           true,
           session.getSessionId().toString(),
@@ -80,22 +80,22 @@ public class SQLSessionService extends SQLFeatureBase<Session, SessionQuery>
   }
 
   public void updateSessionEndTime(Session session) {
-    DB.executeUpdateAsync(
+    DatabaseExecutor.executeUpdateAsync(
         UPDATE_SESSION_ENDTIME_QUERY,
         session.getEndDate() == null ? null : session.getEndDate().toEpochMilli(),
         session.getSessionId().toString());
-    DB.executeUpdateAsync(
+    DatabaseExecutor.executeUpdateAsync(
         UPDATE_LATEST_ENDTIME_QUERY,
         session.getEndDate() == null ? null : session.getEndDate().toEpochMilli(),
         session.getSessionId().toString());
   }
 
   public void endOngoingSessions() {
-    DB.executeUpdateAsync(
+    DatabaseExecutor.executeUpdateAsync(
         UPDATE_ONGOING_SESSION_ENDING_QUERY,
         Instant.now().toEpochMilli(),
         Community.get().getServerId());
-    DB.executeUpdateAsync(
+    DatabaseExecutor.executeUpdateAsync(
         UPDATE_LATEST_ONGOING_SESSION_ENDING_QUERY,
         Instant.now().toEpochMilli(),
         Community.get().getServerId());
@@ -104,10 +104,13 @@ public class SQLSessionService extends SQLFeatureBase<Session, SessionQuery>
   public void endOngoingSessionsSync() {
     long now = Instant.now().toEpochMilli();
     try {
-      DB.executeUpdate(UPDATE_ONGOING_SESSION_ENDING_QUERY, now, Community.get().getServerId());
-      DB.executeUpdate(
-          UPDATE_LATEST_ONGOING_SESSION_ENDING_QUERY, now, Community.get().getServerId());
-    } catch (SQLException exception) {
+      DatabaseExecutor.executeUpdateAsync(
+              UPDATE_ONGOING_SESSION_ENDING_QUERY, now, Community.get().getServerId())
+          .join();
+      DatabaseExecutor.executeUpdateAsync(
+              UPDATE_LATEST_ONGOING_SESSION_ENDING_QUERY, now, Community.get().getServerId())
+          .join();
+    } catch (Exception exception) {
       Community.get()
           .getLogger()
           .warning("Failed to end ongoing sessions during shutdown: " + exception.getMessage());
@@ -126,29 +129,28 @@ public class SQLSessionService extends SQLFeatureBase<Session, SessionQuery>
     if (data.isLoaded()) {
       return CompletableFuture.completedFuture(data.getSession());
     } else {
-      return DB.getFirstRowAsync(
+      return DatabaseExecutor.queryFirstAsync(
               SELECT_LATEST_SESSION_QUERY,
+              result -> {
+                String id = result.getString("session_id");
+                String player = result.getString("player");
+                boolean disguised = result.getBoolean("disguised");
+                String server = result.getString("server");
+
+                long startTime = result.getLong("start_time");
+                Instant start = result.wasNull() ? null : Instant.ofEpochMilli(startTime);
+
+                long endTime = result.getLong("end_time");
+                Instant end = result.wasNull() ? null : Instant.ofEpochMilli(endTime);
+
+                return new Session(
+                    UUID.fromString(id), UUID.fromString(player), disguised, server, start, end);
+              },
               target.getPlayerId().toString(),
               target.ignoreDisguised())
           .thenApplyAsync(result -> {
             if (result != null) {
-              String id = result.getString("session_id");
-
-              String player = result.getString("player");
-              boolean disguised = DatabaseUtils.parseBoolean(result, "disguised");
-
-              String server = result.getString("server");
-
-              Object startTime = result.get("start_time");
-              Object endTime = result.get("end_time");
-
-              data.setSession(new Session(
-                  UUID.fromString(id),
-                  UUID.fromString(player),
-                  disguised,
-                  server,
-                  Instant.ofEpochMilli((Long) startTime),
-                  endTime == null ? null : Instant.ofEpochMilli((Long) endTime)));
+              data.setSession(result);
             }
             return data.getSession();
           });

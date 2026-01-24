@@ -1,16 +1,20 @@
-package dev.pgm.community.moderation.feature;
+package dev.pgm.community.moderation.feature.types;
 
 import static net.kyori.adventure.text.Component.text;
 import static tc.oc.pgm.util.player.PlayerComponent.player;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import dev.pgm.community.Community;
 import dev.pgm.community.CommunityPermissions;
+import dev.pgm.community.events.PlayerPardonEvent;
 import dev.pgm.community.events.PlayerPunishmentEvent;
 import dev.pgm.community.feature.FeatureBase;
 import dev.pgm.community.moderation.ModerationConfig;
+import dev.pgm.community.moderation.feature.ModerationFeature;
+import dev.pgm.community.moderation.feature.PGMPunishmentIntegration;
 import dev.pgm.community.moderation.feature.loggers.BlockGlitchLogger;
 import dev.pgm.community.moderation.feature.loggers.SignLogger;
 import dev.pgm.community.moderation.punishments.NetworkPunishment;
@@ -18,6 +22,7 @@ import dev.pgm.community.moderation.punishments.Punishment;
 import dev.pgm.community.moderation.punishments.PunishmentFormats;
 import dev.pgm.community.moderation.punishments.PunishmentType;
 import dev.pgm.community.moderation.punishments.types.MutePunishment;
+import dev.pgm.community.moderation.store.ModerationStore;
 import dev.pgm.community.moderation.tools.ModerationTools;
 import dev.pgm.community.network.feature.NetworkFeature;
 import dev.pgm.community.network.subs.types.PunishmentSubscriber;
@@ -26,6 +31,7 @@ import dev.pgm.community.network.updates.types.RefreshPunishmentUpdate;
 import dev.pgm.community.users.feature.UsersFeature;
 import dev.pgm.community.utils.BroadcastUtils;
 import dev.pgm.community.utils.CommandAudience;
+import dev.pgm.community.utils.NameUtils;
 import dev.pgm.community.utils.PGMUtils;
 import dev.pgm.community.utils.Sounds;
 import java.time.Duration;
@@ -37,27 +43,34 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.Configuration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
+import org.bukkit.event.player.AsyncPlayerPreLoginEvent.Result;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.jetbrains.annotations.Nullable;
 import tc.oc.pgm.util.Audience;
 import tc.oc.pgm.util.named.NameStyle;
 
-public abstract class ModerationFeatureBase extends FeatureBase implements ModerationFeature {
+public class ModerationFeatureCore extends FeatureBase implements ModerationFeature {
 
+  private final ModerationStore store;
   private final UsersFeature users;
   private final NetworkFeature network;
   private final Set<Punishment> recents;
@@ -73,39 +86,42 @@ public abstract class ModerationFeatureBase extends FeatureBase implements Moder
 
   private boolean color = false;
 
-  public ModerationFeatureBase(
-      ModerationConfig config,
+  public ModerationFeatureCore(
+      Configuration config,
       Logger logger,
-      String featureName,
       UsersFeature users,
-      NetworkFeature network) {
-    super(config, logger, featureName);
+      NetworkFeature network,
+      ModerationStore store) {
+    super(new ModerationConfig(config), logger, "Punishments");
+    this.store = store;
     this.users = users;
     this.network = network;
     this.recents = Sets.newHashSet();
     this.muteCache = CacheBuilder.newBuilder().build();
     this.banEvasionCache = CacheBuilder.newBuilder()
-        .expireAfterWrite(config.getEvasionExpireMins(), TimeUnit.MINUTES)
+        .expireAfterWrite(getModerationConfig().getEvasionExpireMins(), TimeUnit.MINUTES)
         .build();
     this.observerBanCache = CacheBuilder.newBuilder().build();
     this.pardonedPlayers = CacheBuilder.newBuilder().build();
-    this.matchBan = config.getMatchBanDuration() == null
+    this.matchBan = getModerationConfig().getMatchBanDuration() == null
         ? null
         : CacheBuilder.newBuilder()
-            .expireAfterWrite(config.getMatchBanDuration().getSeconds(), TimeUnit.SECONDS)
+            .expireAfterWrite(
+                getModerationConfig().getMatchBanDuration().getSeconds(), TimeUnit.SECONDS)
             .build();
 
-    if (config.isEnabled()) {
+    if (getConfig().isEnabled()) {
       enable();
 
-      if (config.isSignLoggerEnabled()) this.signLogger = new SignLogger();
+      if (getModerationConfig().isSignLoggerEnabled()) this.signLogger = new SignLogger();
       // Set PGM punishment integration
       if (PGMUtils.isPGMEnabled()) {
         this.integration = new PGMPunishmentIntegration(this);
         this.integration.enable();
 
         // BG uses pgm dependencies, only enable if pgm is loaded
-        if (config.isBlockGlitchLoggerEnabled()) this.blockGlitchLogger = new BlockGlitchLogger();
+        if (getModerationConfig().isBlockGlitchLoggerEnabled())
+          this.blockGlitchLogger = new BlockGlitchLogger();
       }
 
       Community.get()
@@ -128,6 +144,286 @@ public abstract class ModerationFeatureBase extends FeatureBase implements Moder
 
   public ModerationConfig getModerationConfig() {
     return (ModerationConfig) getConfig();
+  }
+
+  @Override
+  public void save(Punishment punishment) {
+    if (getModerationConfig().isPersistent()) {
+
+      // When issuing a new ban or mute, check for existing and pardon if any.
+      switch (punishment.getType()) {
+        case TEMP_BAN:
+        case BAN:
+          isBanned(punishment.getTargetId().toString()).thenAcceptAsync(banned -> {
+            if (banned) {
+              store
+                  .pardon(punishment.getTargetId(), punishment.getIssuerId())
+                  .thenAcceptAsync(x -> store.save(punishment));
+            } else {
+              store.save(punishment);
+            }
+          });
+          break;
+        case MUTE:
+          isMuted(punishment.getTargetId()).thenAcceptAsync(mute -> {
+            if (mute.isPresent()) {
+              store
+                  .unmute(punishment.getTargetId(), punishment.getIssuerId())
+                  .thenAcceptAsync(x -> store.save(punishment));
+            } else {
+              store.save(punishment);
+            }
+          });
+          break;
+        default:
+          store.save(punishment);
+          break;
+      }
+    }
+  }
+
+  @Override
+  public CompletableFuture<List<Punishment>> query(String target) {
+    if (NameUtils.isMinecraftName(target)) {
+      // CONVERT TO UUID if username
+      return getUsers()
+          .getStoredId(target)
+          .thenApplyAsync(uuid -> uuid != null && uuid.isPresent()
+              ? store.queryList(uuid.get().toString()).join()
+              : Lists.newArrayList());
+    }
+    return store.queryList(target);
+  }
+
+  @Override
+  public CompletableFuture<Boolean> pardon(String target, @Nullable CommandAudience issuer) {
+    CompletableFuture<Optional<UUID>> playerId = NameUtils.isMinecraftName(target)
+        ? getUsers().getStoredId(target)
+        : CompletableFuture.completedFuture(Optional.of(UUID.fromString(target)));
+    return playerId.thenComposeAsync(uuid -> {
+      // Query active punishments first to know which types exist
+      return uuid.map(value -> store.queryList(value.toString()).thenComposeAsync(punishments -> {
+            List<PunishmentType> activeBanTypes = punishments.stream()
+                .filter(p -> p.isActive() && p.getType().isLoginPrevented())
+                .map(Punishment::getType)
+                .toList();
+
+            if (!activeBanTypes.isEmpty()) {
+              UUID issuerId = issuer != null ? issuer.getId().orElse(null) : null;
+              return store.pardon(value, issuerId).thenApplyAsync(success -> {
+                if (success) {
+                  for (PunishmentType type : activeBanTypes) {
+                    Community.get().callEvent(new PlayerPardonEvent(issuer, value, type));
+                  }
+                  sendRefresh(value);
+                  removeCachedBan(value);
+                }
+                return success;
+              });
+            }
+            return CompletableFuture.completedFuture(false);
+          }))
+          .orElseGet(() -> CompletableFuture.completedFuture(false));
+    });
+  }
+
+  @Override
+  public CompletableFuture<Boolean> deactivate(String target, PunishmentType punishmentType) {
+    CompletableFuture<Optional<UUID>> playerId = NameUtils.isMinecraftName(target)
+        ? getUsers().getStoredId(target)
+        : CompletableFuture.completedFuture(Optional.of(UUID.fromString(target)));
+    return playerId.thenApplyAsync(uuid -> {
+      if (uuid.isPresent()) {
+        if (store.deactivate(uuid.get(), punishmentType).join()) {
+          sendRefresh(uuid.get());
+          return true;
+        }
+      }
+      return false;
+    });
+  }
+
+  @Override
+  public CompletableFuture<Boolean> isBanned(String target) {
+    if (NameUtils.isMinecraftName(target)) {
+      return getUsers()
+          .getStoredId(target)
+          .thenApplyAsync(
+              uuid -> uuid.isPresent() ? store.isBanned(uuid.get().toString()).join() : false);
+    }
+    return store.isBanned(target);
+  }
+
+  @Override
+  public CompletableFuture<Optional<Punishment>> getActiveBan(String target) {
+    if (NameUtils.isMinecraftName(target)) {
+      return getUsers()
+          .getStoredId(target)
+          .thenApplyAsync(uuid -> uuid.isPresent()
+              ? store.getActiveBan(uuid.get().toString()).join()
+              : Optional.empty());
+    }
+    return store.getActiveBan(target);
+  }
+
+  @Override
+  public void onPreLogin(AsyncPlayerPreLoginEvent event) {
+    List<Punishment> punishments;
+    try {
+      punishments = store
+          .queryActiveForLogin(event.getUniqueId().toString())
+          .get(getModerationConfig().getLoginTimeout(), TimeUnit.SECONDS);
+
+      Optional<Punishment> ban = hasActiveBan(punishments);
+      if (ban.isPresent()) {
+        Punishment punishment = ban.get();
+        event.setKickMessage(punishment.formatPunishmentScreen(
+            getModerationConfig(),
+            getUsers().renderUsername(punishment.getIssuerId(), NameStyle.FANCY).join(),
+            false));
+        event.setLoginResult(Result.KICK_BANNED);
+
+        if (punishment.getType() == PunishmentType.NAME_BAN) {
+          String bannedName = punishment.getReason();
+          if (!event.getName().equalsIgnoreCase(bannedName)) {
+            pardon(punishment.getTargetId().toString(), null);
+            event.setLoginResult(Result.ALLOWED);
+            logger.info(String.format(
+                "Name change detected for (%s) | %s -> %s | Account unbanned",
+                punishment.getTargetId().toString(), punishment.getReason(), event.getName()));
+          }
+        }
+      }
+
+      Optional<MutePunishment> mute = hasActiveMute(punishments);
+      if (mute.isPresent()) {
+        addMute(event.getUniqueId(), mute.get());
+      }
+
+      Set<Punishment> deferredPunishments = getDeferredPunishments(punishments);
+      for (Punishment punishment : deferredPunishments) {
+        Bukkit.getScheduler()
+            .runTaskLater(
+                Community.get(),
+                () -> {
+                  if (PunishmentType.WARN.equals(punishment.getType())
+                      || PunishmentType.KICK.equals(punishment.getType())) {
+                    if (punishment.punish(true)) {
+                      deactivate(event.getUniqueId().toString(), punishment.getType());
+                    }
+                  }
+                },
+                20 * 5);
+      }
+
+      logger.info(punishments.size()
+          + " Punishments have been fetched for "
+          + event.getUniqueId().toString());
+    } catch (InterruptedException | ExecutionException e) {
+      event.setLoginResult(Result.KICK_OTHER);
+      event.setKickMessage(
+          ChatColor.DARK_RED + "Error joining, please try again."); // TODO: Pretty this up
+      e.printStackTrace();
+    } catch (TimeoutException e) {
+      scheduleDelayedCheck(event.getUniqueId());
+    }
+  }
+
+  private void scheduleDelayedCheck(UUID playerId) {
+    Community.get()
+        .getServer()
+        .getScheduler()
+        .scheduleSyncDelayedTask(Community.get(), new Runnable() {
+          @Override
+          public void run() {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null) {
+              store.queryActiveForLogin(playerId.toString()).thenAcceptAsync(punishments -> {
+                Optional<Punishment> ban = hasActiveBan(punishments);
+                if (ban.isPresent()) {
+                  Punishment punishment = ban.get();
+
+                  player.kickPlayer(punishment.formatPunishmentScreen(
+                      getModerationConfig(),
+                      getUsers()
+                          .renderUsername(punishment.getIssuerId(), NameStyle.FANCY)
+                          .join(),
+                      false));
+                }
+
+                Optional<MutePunishment> mute = hasActiveMute(punishments);
+                if (mute.isPresent()) {
+                  addMute(playerId, mute.get());
+                }
+
+                logger.info("[Delayed]: "
+                    + punishments.size()
+                    + " Punishments have been fetched for "
+                    + playerId.toString());
+              });
+            }
+          }
+        });
+  }
+
+  private Optional<MutePunishment> hasActiveMute(List<Punishment> punishments) {
+    return punishments.stream()
+        .filter(p -> p.isActive()
+            && p.getType().equals(PunishmentType.MUTE)
+            && p.getService().equalsIgnoreCase(getModerationConfig().getService()))
+        .map(MutePunishment.class::cast)
+        .findAny();
+  }
+
+  private Optional<Punishment> hasActiveBan(List<Punishment> punishments) {
+    return punishments.stream()
+        .filter(p -> p.isActive()
+            && p.getType().isLoginPrevented()
+            && p.getService().equalsIgnoreCase(getModerationConfig().getService()))
+        .findAny();
+  }
+
+  private Set<Punishment> getDeferredPunishments(List<Punishment> punishments) {
+    return punishments.stream()
+        .filter(p -> p.isActive()
+            && (PunishmentType.WARN.equals(p.getType()) || PunishmentType.KICK.equals(p.getType())))
+        .collect(Collectors.toSet());
+  }
+
+  @Override
+  public CompletableFuture<Optional<Punishment>> isMuted(UUID target) {
+    return store.isMuted(target);
+  }
+
+  @Override
+  public CompletableFuture<Boolean> unmute(UUID id, @Nullable CommandAudience issuer) {
+    UUID issuerId = issuer != null ? issuer.getId().orElse(null) : null;
+    return store.unmute(id, issuerId).thenApplyAsync(success -> {
+      if (success) {
+        // Fire pardon event before refresh
+        Community.get().callEvent(new PlayerPardonEvent(issuer, id, PunishmentType.MUTE));
+        removeMute(id);
+        sendRefresh(id); // Successful unmute will update other servers
+      }
+      return success;
+    });
+  }
+
+  @Override
+  public CompletableFuture<List<Punishment>> getRecentPunishments(Duration period) {
+    return store.getRecentPunishments(period);
+  }
+
+  @Override
+  public CompletableFuture<Integer> count() {
+    return store.count();
+  }
+
+  @Override
+  public void recieveRefresh(UUID playerId) {
+    store.invalidate(playerId);
+    removeCachedBan(playerId);
+    removeMute(playerId);
   }
 
   @Override
@@ -247,7 +543,7 @@ public abstract class ModerationFeatureBase extends FeatureBase implements Moder
         punishment, network.getNetworkId())); // Send out network punishment update
 
     switch (punishment.getType()) {
-        // Cache known IPS of a recently banned player, so if they rejoin on an alt we can find them
+      // Cache known IPS of a recently banned player, so if they rejoin on an alt we can find them
       case BAN:
       case TEMP_BAN:
       case NAME_BAN:

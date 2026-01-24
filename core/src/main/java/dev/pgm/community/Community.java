@@ -1,7 +1,6 @@
 package dev.pgm.community;
 
 import dev.pgm.community.commands.graph.CommunityCommandGraph;
-import dev.pgm.community.database.DatabaseConnection;
 import dev.pgm.community.events.CommunityEvent;
 import dev.pgm.community.feature.FeatureManager;
 import dev.pgm.community.squads.SquadChannel;
@@ -23,9 +22,6 @@ public class Community extends JavaPlugin {
 
   // Config for general stuff (database)
   private CommunityConfig config;
-
-  // Database
-  private DatabaseConnection database;
 
   // Feature Manager
   private FeatureManager features;
@@ -58,13 +54,14 @@ public class Community extends JavaPlugin {
     }
 
     this.setupConfig();
-    this.setupDatabase();
+    getLogger().info(dev.pgm.community.database.DatabaseExecutor.describeBackend());
     this.setupFeatures();
   }
 
   @Override
   public void onDisable() {
     features.disable();
+    dev.pgm.community.database.DatabaseExecutor.shutdown();
   }
 
   public void reload() {
@@ -80,10 +77,6 @@ public class Community extends JavaPlugin {
     this.saveDefaultConfig();
     this.reloadConfig();
     this.config = new CommunityConfig(getConfig());
-  }
-
-  private void setupDatabase() {
-    this.database = new DatabaseConnection(this);
   }
 
   private void setupCommands() {
@@ -111,7 +104,7 @@ public class Community extends JavaPlugin {
   private void setupFeatures() {
     this.setupTranslations();
     this.setupInventory();
-    this.features = new FeatureManager(getConfig(), getLogger(), database, inventory);
+    this.features = new FeatureManager(getConfig(), getLogger(), inventory);
     this.setupCommands();
   }
 

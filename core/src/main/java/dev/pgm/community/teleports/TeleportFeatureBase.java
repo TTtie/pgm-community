@@ -19,6 +19,9 @@ public class TeleportFeatureBase extends FeatureBase implements TeleportFeature 
 
   public TeleportFeatureBase(Configuration config, Logger logger) {
     super(new TeleportConfig(config), logger, "Teleports");
+    if (getTeleportConfig().isEnabled()) {
+      enable();
+    }
   }
 
   public TeleportConfig getTeleportConfig() {
@@ -28,9 +31,8 @@ public class TeleportFeatureBase extends FeatureBase implements TeleportFeature 
   @Override
   public void teleport(
       CommandAudience sender, Player teleporter, Location target, Component message) {
-    boolean involved =
-        sender.isPlayer()
-            && (sender.getPlayer().equals(teleporter) || sender.getPlayer().equals(teleporter));
+    boolean involved = sender.isPlayer()
+        && (sender.getPlayer().equals(teleporter) || sender.getPlayer().equals(teleporter));
 
     teleporter.teleport(target);
     if (message != null) {
@@ -38,12 +40,11 @@ public class TeleportFeatureBase extends FeatureBase implements TeleportFeature 
     }
 
     if (!involved) {
-      sender.sendMessage(
-          text("Teleported ")
-              .append(player(teleporter, NameStyle.FANCY))
-              .append(text(" to "))
-              .append(formatLocation(target))
-              .color(NamedTextColor.GRAY));
+      sender.sendMessage(text("Teleported ")
+          .append(player(teleporter, NameStyle.FANCY))
+          .append(text(" to "))
+          .append(formatLocation(target))
+          .color(NamedTextColor.GRAY));
     }
   }
 
@@ -55,9 +56,8 @@ public class TeleportFeatureBase extends FeatureBase implements TeleportFeature 
       Component teleporterMsg,
       Component targetMsg,
       boolean senderFeedback) {
-    boolean involved =
-        sender.isPlayer()
-            && (sender.getPlayer().equals(teleporter) || sender.getPlayer().equals(target));
+    boolean involved = sender.isPlayer()
+        && (sender.getPlayer().equals(teleporter) || sender.getPlayer().equals(target));
 
     teleporter.teleport(target);
 
@@ -70,12 +70,11 @@ public class TeleportFeatureBase extends FeatureBase implements TeleportFeature 
     }
 
     if (senderFeedback && !involved) {
-      sender.sendMessage(
-          text("Teleported ")
-              .append(player(teleporter, NameStyle.FANCY))
-              .append(text(" to "))
-              .append(player(target, NameStyle.FANCY))
-              .color(NamedTextColor.GRAY));
+      sender.sendMessage(text("Teleported ")
+          .append(player(teleporter, NameStyle.FANCY))
+          .append(text(" to "))
+          .append(player(target, NameStyle.FANCY))
+          .color(NamedTextColor.GRAY));
     }
   }
 

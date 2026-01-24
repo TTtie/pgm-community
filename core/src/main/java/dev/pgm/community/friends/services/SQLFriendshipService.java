@@ -1,15 +1,13 @@
 package dev.pgm.community.friends.services;
 
-import co.aikar.idb.DB;
-import co.aikar.idb.DbRow;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Sets;
+import dev.pgm.community.database.DatabaseExecutor;
 import dev.pgm.community.feature.SQLFeatureBase;
 import dev.pgm.community.friends.Friendship;
 import dev.pgm.community.friends.Friendship.FriendshipStatus;
-import dev.pgm.community.utils.DatabaseUtils;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -46,7 +44,7 @@ public class SQLFriendshipService extends SQLFeatureBase<Friendship, String>
       cachedRequested.getFriendships().add(friendship);
     }
 
-    DB.executeUpdateAsync(
+    DatabaseExecutor.executeUpdateAsync(
         INSERT_FRIENDSHIP_QUERY,
         friendship.getFriendshipId().toString(),
         friendship.getRequesterId().toString(),
@@ -79,7 +77,7 @@ public class SQLFriendshipService extends SQLFeatureBase<Friendship, String>
       }
     }
 
-    DB.executeUpdateAsync(
+    DatabaseExecutor.executeUpdateAsync(
         UPDATE_FRIENDSHIP_QUERY,
         friendship.getStatus().toString().toUpperCase(),
         friendship.getLastUpdated().toEpochMilli(),
@@ -95,30 +93,32 @@ public class SQLFriendshipService extends SQLFeatureBase<Friendship, String>
     if (playerFriendships.isLoaded()) {
       return CompletableFuture.completedFuture(new ArrayList<>(playerFriendships.getFriendships()));
     } else {
-      return DB.getResultsAsync(SELECT_FRIENDSHIPS_QUERY, playerId.toString(), playerId.toString())
-          .thenApplyAsync(results -> {
-            if (results != null) {
-              for (DbRow row : results) {
+      return DatabaseExecutor.queryAsync(
+              SELECT_FRIENDSHIPS_QUERY,
+              row -> {
                 String id = row.getString("id");
                 String requester = row.getString("requester");
                 String requested = row.getString("requested");
                 String status = row.getString("status");
-                long requestDate = DatabaseUtils.parseLong(row, "requestDate");
-                long updateDate = DatabaseUtils.parseLong(row, "updateDate");
+                long requestDate = row.getLong("requestDate");
+                long updateDate = row.getLong("updateDate");
 
                 Instant requestInstant = Instant.ofEpochMilli(requestDate);
                 Instant updateInstant = Instant.ofEpochMilli(updateDate);
 
-                playerFriendships
-                    .getFriendships()
-                    .add(new Friendship(
-                        UUID.fromString(id),
-                        UUID.fromString(requester),
-                        UUID.fromString(requested),
-                        FriendshipStatus.valueOf(status.toUpperCase()),
-                        requestInstant,
-                        updateInstant));
-              }
+                return new Friendship(
+                    UUID.fromString(id),
+                    UUID.fromString(requester),
+                    UUID.fromString(requested),
+                    FriendshipStatus.valueOf(status.toUpperCase()),
+                    requestInstant,
+                    updateInstant);
+              },
+              playerId.toString(),
+              playerId.toString())
+          .thenApplyAsync(results -> {
+            if (results != null) {
+              playerFriendships.getFriendships().addAll(results);
             }
             playerFriendships.setLoaded(true);
             return new ArrayList<>(playerFriendships.getFriendships());

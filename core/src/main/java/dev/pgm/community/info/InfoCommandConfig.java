@@ -23,9 +23,11 @@ public class InfoCommandConfig extends FeatureConfigImpl {
   @Override
   public void reload(Configuration config) {
     super.reload(config);
-    this.commands =
-        config.getConfigurationSection(KEY).getKeys(false).stream()
-            .map(key -> InfoCommandData.of(config.getConfigurationSection(KEY + "." + key)))
-            .collect(Collectors.toSet());
+    if (!config.contains(getKey() + ".enabled")) {
+      setEnabled(true);
+    }
+    this.commands = config.getConfigurationSection(KEY).getKeys(false).stream()
+        .map(key -> InfoCommandData.of(config.getConfigurationSection(KEY + "." + key)))
+        .collect(Collectors.toSet());
   }
 }

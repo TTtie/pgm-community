@@ -1,13 +1,11 @@
 package dev.pgm.community.users.services;
 
-import co.aikar.idb.DB;
-import co.aikar.idb.DbRow;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Sets;
+import dev.pgm.community.database.DatabaseExecutor;
 import dev.pgm.community.database.Query;
-import dev.pgm.community.utils.DatabaseUtils;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -51,42 +49,45 @@ public class AddressHistoryService implements AddressQuery {
       }
     });
 
-    DB.executeUpdateAsync(Query.createTable(IP_TABLE_NAME, IP_TABLE_FIELDS));
-    DB.executeUpdateAsync(Query.createTable(IP_USER_TABLE_NAME, IP_USER_TABLE_FIELDS));
-    DB.executeUpdateAsync(Query.createTable(LATEST_IP_TABLE_NAME, LATEST_IP_TABLE_FIELDS));
+    DatabaseExecutor.executeUpdateAsync(Query.createTable(IP_TABLE_NAME, IP_TABLE_FIELDS));
+    DatabaseExecutor.executeUpdateAsync(
+        Query.createTable(IP_USER_TABLE_NAME, IP_USER_TABLE_FIELDS));
+    DatabaseExecutor.executeUpdateAsync(
+        Query.createTable(LATEST_IP_TABLE_NAME, LATEST_IP_TABLE_FIELDS));
   }
 
   public void trackIp(UUID id, String address) {
     historyCache.invalidate(id);
 
-    DB.executeUpdateAsync(
+    DatabaseExecutor.executeUpdateAsync(
         INSERT_LATEST_IP_QUERY, id.toString(), address, Instant.now().toEpochMilli());
 
-    DB.getFirstRowAsync(SELECT_IP_QUERY, address).thenAcceptAsync(result -> {
-      final UUID randomId = UUID.randomUUID();
-      String ipId = randomId.toString();
+    DatabaseExecutor.queryFirstAsync(SELECT_IP_QUERY, row -> row.getString(IP_ID_FIELD), address)
+        .thenAcceptAsync(ipIdResult -> {
+          final UUID randomId = UUID.randomUUID();
+          String ipId = randomId.toString();
 
-      if (result == null) {
-        // Track a new ip-id
-        DB.executeUpdateAsync(INSERT_IP_QUERY, address, ipId);
-      } else {
-        ipId = result.getString(IP_ID_FIELD);
-      }
+          if (ipIdResult == null) {
+            // Track a new ip-id
+            DatabaseExecutor.executeUpdateAsync(INSERT_IP_QUERY, address, ipId);
+          } else {
+            ipId = ipIdResult;
+          }
 
-      // Update alts for an already cached IP
-      IpAlts alts = altsCache.getUnchecked(ipId);
-      if (alts.isLoaded()) {
-        alts.getPlayerIds().add(id.toString());
-      }
+          // Update alts for an already cached IP
+          IpAlts alts = altsCache.getUnchecked(ipId);
+          if (alts.isLoaded()) {
+            alts.getPlayerIds().add(id.toString());
+          }
 
-      Set<String> known = getKnownIps(id).join();
-      if (known == null
-          || known.isEmpty()
-          || !known.stream().anyMatch(ip -> ip.equalsIgnoreCase(address))) {
-        // Add user to known ip-id list
-        DB.executeUpdateAsync(INSERT_IP_USER_QUERY, id.toString(), ipId);
-      }
-    });
+          Set<String> known = getKnownIps(id).join();
+          if (known == null
+              || known.isEmpty()
+              || !known.stream().anyMatch(ip -> ip.equalsIgnoreCase(address))) {
+            // Add user to known ip-id list
+            DatabaseExecutor.executeUpdateAsync(INSERT_IP_USER_QUERY, id.toString(), ipId);
+          }
+        });
   }
 
   public CompletableFuture<LatestAddressInfo> getLatestAddressInfo(UUID playerId) {
@@ -94,17 +95,24 @@ public class AddressHistoryService implements AddressQuery {
     if (info.isLoaded()) {
       return CompletableFuture.completedFuture(info);
     } else {
-      return DB.getFirstRowAsync(SELECT_LATEST_IP_QUERY, playerId.toString())
+      return DatabaseExecutor.queryFirstAsync(
+              SELECT_LATEST_IP_QUERY,
+              result -> {
+                String address = result.getString(IP_ADDRESS_FIELD);
+                long time = result.getLong(DATE_FIELD);
+                Instant date = Instant.ofEpochMilli(time);
+                info.setAddress(address);
+                info.setDate(date);
+                info.setLoaded(true);
+                return info;
+              },
+              playerId.toString())
           .thenApplyAsync(result -> {
-            if (result != null) {
-              String address = result.getString(IP_ADDRESS_FIELD);
-              long time = DatabaseUtils.parseLong(result, DATE_FIELD);
-              Instant date = Instant.ofEpochMilli(time);
-              info.setAddress(address);
-              info.setDate(date);
+            if (result == null) {
+              info.setLoaded(true);
+              return info;
             }
-            info.setLoaded(true);
-            return info;
+            return result;
           });
     }
   }
@@ -115,11 +123,11 @@ public class AddressHistoryService implements AddressQuery {
     if (history.isLoaded()) {
       return CompletableFuture.completedFuture(history);
     } else {
-      return DB.getResultsAsync(SELECT_IP_HISTORY_QUERY, playerId.toString())
+      return DatabaseExecutor.queryAsync(
+              SELECT_IP_HISTORY_QUERY, row -> row.getString("ip_id"), playerId.toString())
           .thenApplyAsync(results -> {
             if (results != null && !results.isEmpty()) {
-              for (DbRow row : results) {
-                String ipId = row.getString("ip_id");
+              for (String ipId : results) {
                 history.addAddress(ipId);
               }
             }
@@ -138,9 +146,10 @@ public class AddressHistoryService implements AddressQuery {
       for (String ipId : addressHistory.getAddresses()) {
         ResolvedIP ip = resolvedIPCache.getUnchecked(ipId);
         if (!ip.isLoaded()) {
-          DbRow row = DB.getFirstRowAsync(SELECT_IP_ID_QUERY, ipId).join();
-          if (row != null) {
-            String resolved = row.getString(IP_ADDRESS_FIELD);
+          String resolved = DatabaseExecutor.queryFirstAsync(
+                  SELECT_IP_ID_QUERY, row -> row.getString(IP_ADDRESS_FIELD), ipId)
+              .join();
+          if (resolved != null) {
             ip.setAddress(resolved);
           }
         }
@@ -158,12 +167,11 @@ public class AddressHistoryService implements AddressQuery {
         IpAlts addressAlts = altsCache.getUnchecked(address);
 
         if (!addressAlts.isLoaded()) {
-          List<DbRow> rows = DB.getResultsAsync(SELECT_ALTS_QUERY, address).join();
+          List<String> rows = DatabaseExecutor.queryAsync(
+                  SELECT_ALTS_QUERY, row -> row.getString(USER_ID_FIELD), address)
+              .join();
           if (rows != null && !rows.isEmpty()) {
-            for (DbRow row : rows) {
-              String userId = row.getString(USER_ID_FIELD);
-              addressAlts.getPlayerIds().add(userId);
-            }
+            addressAlts.getPlayerIds().addAll(rows);
           }
           addressAlts.setLoaded(true);
         }

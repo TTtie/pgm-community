@@ -1,6 +1,6 @@
 package dev.pgm.community.feature;
 
-import co.aikar.idb.DB;
+import dev.pgm.community.database.DatabaseExecutor;
 import dev.pgm.community.database.Query;
 import java.util.concurrent.CompletableFuture;
 
@@ -18,10 +18,11 @@ public abstract class SQLFeatureBase<T, R> implements SQLFeature<T, R> {
 
   @Override
   public void createTable() {
-    DB.executeUpdateAsync(Query.createTable(tableName, fields));
+    DatabaseExecutor.executeUpdateAsync(Query.createTable(tableName, fields));
   }
 
   public CompletableFuture<Integer> count() {
-    return DB.getFirstColumnAsync(Query.countTable(tableName));
+    return DatabaseExecutor.queryFirstAsync(Query.countTable(tableName), result -> result.getInt(1))
+        .thenApplyAsync(result -> result == null ? 0 : result);
   }
 }

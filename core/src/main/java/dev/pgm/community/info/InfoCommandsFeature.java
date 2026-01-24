@@ -12,7 +12,9 @@ public class InfoCommandsFeature extends FeatureBase {
 
   public InfoCommandsFeature(Configuration config, Logger logger) {
     super(new InfoCommandConfig(config), logger, "Info Commands");
-    enable();
+    if (getInfoConfig().isEnabled()) {
+      enable();
+    }
   }
 
   public InfoCommandConfig getInfoConfig() {
@@ -23,13 +25,13 @@ public class InfoCommandsFeature extends FeatureBase {
   public void onPlayerCommandProcess(PlayerCommandPreprocessEvent event) {
     // We dynamically check for defined commands, and send the related feedback
     getInfoConfig().getInfoCommands().stream()
-        .filter(c -> event.getMessage().toLowerCase().startsWith("/" + c.getName().toLowerCase()))
+        .filter(
+            c -> event.getMessage().toLowerCase().startsWith("/" + c.getName().toLowerCase()))
         .findAny()
-        .ifPresent(
-            command -> {
-              command.sendCommand(event.getPlayer());
-              event.setCancelled(true);
-            });
+        .ifPresent(command -> {
+          command.sendCommand(event.getPlayer());
+          event.setCancelled(true);
+        });
   }
 
   @Override

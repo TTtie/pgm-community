@@ -1,13 +1,12 @@
 package dev.pgm.community.users.services;
 
-import co.aikar.idb.DB;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import dev.pgm.community.database.DatabaseExecutor;
 import dev.pgm.community.feature.SQLFeatureBase;
 import dev.pgm.community.users.UserProfile;
 import dev.pgm.community.users.UserProfileImpl;
-import dev.pgm.community.utils.DatabaseUtils;
 import dev.pgm.community.utils.NameUtils;
 import java.time.Instant;
 import java.util.List;
@@ -32,7 +31,7 @@ public class SQLUserService extends SQLFeatureBase<UserProfile, String> implemen
 
   @Override
   public void save(UserProfile profile) {
-    DB.executeUpdateAsync(
+    DatabaseExecutor.executeUpdateAsync(
         INSERT_USER_QUERY,
         profile.getId().toString(),
         profile.getUsername(),
@@ -68,26 +67,25 @@ public class SQLUserService extends SQLFeatureBase<UserProfile, String> implemen
       return CompletableFuture.completedFuture(data.getProfile());
     }
 
-    return DB.getFirstRowAsync(data == null ? USERNAME_QUERY : PLAYERID_QUERY, target)
-        .thenApplyAsync(result -> {
-          if (result != null) {
-            final UUID id = UUID.fromString(result.getString("id"));
-            final String username = result.getString("name");
-            final long firstJoin = DatabaseUtils.parseLong(result, "first_join");
-            final int joinCount = result.getInt("join_count");
+    return DatabaseExecutor.queryFirstAsync(
+        data == null ? USERNAME_QUERY : PLAYERID_QUERY,
+        result -> {
+          final UUID id = UUID.fromString(result.getString("id"));
+          final String username = result.getString("name");
+          final long firstJoin = result.getLong("first_join");
+          final int joinCount = result.getInt("join_count");
 
-            UserData loadedData = new UserData(id);
-            loadedData.setProfile(
-                new UserProfileImpl(id, username, Instant.ofEpochMilli(firstJoin), joinCount));
-            profileCache.put(id, loadedData);
-            return loadedData.getProfile();
-          }
-          return null;
-        });
+          UserData loadedData = new UserData(id);
+          loadedData.setProfile(
+              new UserProfileImpl(id, username, Instant.ofEpochMilli(firstJoin), joinCount));
+          profileCache.put(id, loadedData);
+          return loadedData.getProfile();
+        },
+        target);
   }
 
   private void update(UserProfile profile) {
-    DB.executeUpdateAsync(
+    DatabaseExecutor.executeUpdateAsync(
         UPDATE_USER_QUERY,
         profile.getUsername(),
         profile.getJoinCount(),

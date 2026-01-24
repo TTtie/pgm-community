@@ -1,37 +1,38 @@
 package dev.pgm.community.feature;
 
 import dev.pgm.community.assistance.feature.AssistanceFeature;
-import dev.pgm.community.assistance.feature.types.SQLAssistanceFeature;
+import dev.pgm.community.assistance.feature.types.AssistanceFeatureCore;
 import dev.pgm.community.audit.CommandAuditFeature;
 import dev.pgm.community.broadcast.BroadcastFeature;
 import dev.pgm.community.chat.management.ChatManagementFeature;
 import dev.pgm.community.chat.network.NetworkChatFeature;
-import dev.pgm.community.database.DatabaseConnection;
 import dev.pgm.community.freeze.FreezeFeature;
 import dev.pgm.community.friends.feature.FriendshipFeature;
-import dev.pgm.community.friends.feature.types.SQLFriendshipFeature;
+import dev.pgm.community.friends.feature.types.FriendshipFeatureCore;
 import dev.pgm.community.history.MatchHistoryFeature;
 import dev.pgm.community.info.InfoCommandsFeature;
 import dev.pgm.community.mobs.MobFeature;
 import dev.pgm.community.moderation.feature.ModerationFeature;
-import dev.pgm.community.moderation.feature.types.SQLModerationFeature;
+import dev.pgm.community.moderation.feature.types.ModerationFeatureCore;
 import dev.pgm.community.motd.MotdFeature;
 import dev.pgm.community.mutations.feature.MutationFeature;
 import dev.pgm.community.network.feature.NetworkFeature;
 import dev.pgm.community.network.types.RedisNetworkFeature;
 import dev.pgm.community.nick.feature.NickFeature;
-import dev.pgm.community.nick.feature.types.SQLNickFeature;
+import dev.pgm.community.nick.feature.types.NickFeatureCore;
 import dev.pgm.community.party.feature.MapPartyFeature;
 import dev.pgm.community.polls.feature.PollFeature;
 import dev.pgm.community.requests.feature.RequestFeature;
-import dev.pgm.community.requests.feature.types.SQLRequestFeature;
+import dev.pgm.community.requests.feature.types.RequestFeatureCore;
 import dev.pgm.community.sessions.feature.SessionFeature;
-import dev.pgm.community.sessions.feature.types.SQLSessionFeature;
+import dev.pgm.community.sessions.feature.types.SessionFeatureCore;
 import dev.pgm.community.squads.SquadFeature;
+import dev.pgm.community.store.StoreFactory;
+import dev.pgm.community.store.Stores;
 import dev.pgm.community.teleports.TeleportFeature;
 import dev.pgm.community.teleports.TeleportFeatureBase;
 import dev.pgm.community.users.feature.UsersFeature;
-import dev.pgm.community.users.feature.types.SQLUsersFeature;
+import dev.pgm.community.users.feature.types.UsersFeatureCore;
 import fr.minuskube.inv.InventoryManager;
 import java.util.logging.Logger;
 import org.bukkit.configuration.Configuration;
@@ -63,25 +64,23 @@ public class FeatureManager {
   private final SquadFeature squads;
   private final MatchHistoryFeature history;
 
-  public FeatureManager(
-      Configuration config,
-      Logger logger,
-      DatabaseConnection database,
-      InventoryManager inventory) {
+  public FeatureManager(Configuration config, Logger logger, InventoryManager inventory) {
     // Networking
     this.network = new RedisNetworkFeature(config, logger);
+    Stores stores = StoreFactory.create(config, logger);
 
     // DB Features
-    this.users = new SQLUsersFeature(config, logger);
-    this.sessions = new SQLSessionFeature(users, logger);
-    this.reports = new SQLAssistanceFeature(config, logger, users, network, inventory);
-    this.moderation = new SQLModerationFeature(config, logger, users, network);
-    this.friends = new SQLFriendshipFeature(config, logger, users);
-    this.nick = new SQLNickFeature(config, logger, users);
-    this.requests = new SQLRequestFeature(config, logger, users);
+    this.users = new UsersFeatureCore(config, logger, stores.users());
+    this.sessions = new SessionFeatureCore(users, logger, stores.sessions());
+    this.reports =
+        new AssistanceFeatureCore(config, logger, users, network, inventory, stores.assistance());
+    this.moderation =
+        new ModerationFeatureCore(config, logger, users, network, stores.moderation());
+    this.friends = new FriendshipFeatureCore(config, logger, users, stores.friends());
+    this.nick = new NickFeatureCore(config, logger, users, stores.nicks());
+    this.requests = new RequestFeatureCore(config, logger, users, stores.requests());
 
-    // TODO: 1. Add support for non-persist database (e.g NoDBUsersFeature)
-    // TODO: 2. Support non-sql databases?
+    // TODO: 1. Support non-sql databases?
     // Ex. FileReportFeature, MongoReportFeature, RedisReportFeature...
     // Not a priority
 

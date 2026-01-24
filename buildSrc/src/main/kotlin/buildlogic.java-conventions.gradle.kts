@@ -23,8 +23,6 @@ dependencies {
     implementation("fr.minuskube.inv:smart-invs:1.2.7") { isTransitive = false }
 
     implementation("redis.clients:jedis:3.5.1")
-    implementation("co.aikar:idb-core:1.0.0-SNAPSHOT")
-    implementation("co.aikar:idb-bukkit:1.0.0-SNAPSHOT")
     implementation("net.kyori:adventure-api:4.25.0")
     implementation("net.kyori:adventure-text-serializer-plain:4.25.0")
     implementation("net.kyori:adventure-platform-bukkit:4.4.1")

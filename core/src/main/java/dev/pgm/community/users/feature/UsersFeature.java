@@ -137,8 +137,6 @@ public interface UsersFeature extends Feature {
    */
   void setName(UUID id, String name);
 
-  /* Events to be handled by FeatureImpls */
-
   void onLogin(PlayerJoinEvent login);
 
   void saveImportedUser(UUID id, String name);

@@ -1,13 +1,12 @@
 package dev.pgm.community.requests.services;
 
-import co.aikar.idb.DB;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Lists;
+import dev.pgm.community.database.DatabaseExecutor;
 import dev.pgm.community.feature.SQLFeatureBase;
 import dev.pgm.community.requests.RequestProfile;
-import dev.pgm.community.utils.DatabaseUtils;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -52,7 +51,7 @@ public class SQLRequestService extends SQLFeatureBase<RequestProfile, String>
 
   @Override
   public void save(RequestProfile profile) {
-    DB.executeUpdateAsync(
+    DatabaseExecutor.executeUpdateAsync(
         INSERT_REQUESTS_QUERY,
         profile.getPlayerId().toString(),
         convertTime(profile.getLastRequestTime()),
@@ -67,7 +66,7 @@ public class SQLRequestService extends SQLFeatureBase<RequestProfile, String>
   }
 
   public void update(RequestProfile profile) {
-    DB.executeUpdateAsync(
+    DatabaseExecutor.executeUpdateAsync(
         UPDATE_REQUEST_QUERY,
         convertTime(profile.getLastRequestTime()),
         profile.getLastRequestMap(),
@@ -93,38 +92,43 @@ public class SQLRequestService extends SQLFeatureBase<RequestProfile, String>
     if (profile.isLoaded() && profile.getProfile() != null) {
       return CompletableFuture.completedFuture(profile.getProfile());
     } else {
-      return DB.getFirstRowAsync(SELECT_REQUEST_QUERY, playerId.toString())
+      return DatabaseExecutor.queryFirstAsync(
+              SELECT_REQUEST_QUERY,
+              result -> {
+                final UUID id = UUID.fromString(result.getString("id"));
+                final long lastRequest = result.getLong("last_request_time");
+                final String lastRequestMap = result.getString("last_request_map");
+                final long lastSponsor = result.getLong("last_sponsor_time");
+                final String lastSponsorMap = result.getString("last_sponsor_map");
+                final int tokens = result.getInt("tokens");
+                final long lastToken = result.getLong("last_token_refresh");
+                final int superVotes = result.getInt("super_votes");
+                final long lastSuperVote = result.getLong("last_super_vote");
+
+                final Instant lastRequestTime =
+                    lastRequest == -1 ? null : Instant.ofEpochMilli(lastRequest);
+                final Instant lastSponsorTime =
+                    lastSponsor == -1 ? null : Instant.ofEpochMilli(lastSponsor);
+                final Instant lastTokenRefreshTime =
+                    lastToken == -1 ? null : Instant.ofEpochMilli(lastToken);
+                final Instant lastSuperVoteTime =
+                    lastSuperVote == -1 ? null : Instant.ofEpochMilli(lastSuperVote);
+
+                return new RequestProfile(
+                    id,
+                    lastRequestTime,
+                    lastRequestMap,
+                    lastSponsorTime,
+                    lastSponsorMap,
+                    tokens,
+                    lastTokenRefreshTime,
+                    superVotes,
+                    lastSuperVoteTime);
+              },
+              playerId.toString())
           .thenApplyAsync(result -> {
             if (result != null) {
-              final UUID id = UUID.fromString(result.getString("id"));
-              final long lastRequest = DatabaseUtils.parseLong(result, "last_request_time");
-              final String lastRequestMap = result.getString("last_request_map");
-              final long lastSponsor = DatabaseUtils.parseLong(result, "last_sponsor_time");
-              final String lastSponsorMap = result.getString("last_sponsor_map");
-              final int tokens = result.getInt("tokens");
-              final long lastToken = DatabaseUtils.parseLong(result, "last_token_refresh");
-              final int superVotes = result.getInt("super_votes");
-              final long lastSuperVote = DatabaseUtils.parseLong(result, "last_super_vote");
-
-              final Instant lastRequestTime =
-                  lastRequest == -1 ? null : Instant.ofEpochMilli(lastRequest);
-              final Instant lastSponsorTime =
-                  lastSponsor == -1 ? null : Instant.ofEpochMilli(lastSponsor);
-              final Instant lastTokenRefreshTime =
-                  lastToken == -1 ? null : Instant.ofEpochMilli(lastToken);
-              final Instant lastSuperVoteTime =
-                  lastSuperVote == -1 ? null : Instant.ofEpochMilli(lastSuperVote);
-
-              profile.setProfile(new RequestProfile(
-                  id,
-                  lastRequestTime,
-                  lastRequestMap,
-                  lastSponsorTime,
-                  lastSponsorMap,
-                  tokens,
-                  lastTokenRefreshTime,
-                  superVotes,
-                  lastSuperVoteTime));
+              profile.setProfile(result);
             }
             profile.setLoaded(true);
             return profile.getProfile();

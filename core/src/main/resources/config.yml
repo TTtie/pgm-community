@@ -181,6 +181,7 @@ chat:
     
 # Custom Info Commands    
 commands:
+  enabled: true
   # Example of /rules command
   rules: # The command name is defined as the config section
     permission: "community.rules" # You can define any permission node, or use "" for no permission
@@ -394,15 +395,12 @@ network:
   
   
 database:
-  enabled: false # True for MySQL, false for SQLite
+  # Backend options: "sql" uses the Database plugin, "sqlite" stores data locally.
+  # If you use "sql", install and configure the Database plugin. Link: https://github.com/OvercastCommunity/Database
+  # "name" maps to the database id defined by the Database plugin config.
+  backend: "sql" # Options: sql (default), sqlite
+  name: "primary" # Optional named database from Database plugin
   
-  # SQLite settings (used if enabled is false)
-  sqlite-file: "community.sql"
-  
-  # MySQL settings (used if enabled is true)
-  username: "username" 
-  password: "password"
-  databaseName: "minecraft"
-  host: "localhost:3306" # host and port
-  timezone: "America/Los_Angeles" # Database timezone
-  max-connections: 2 # Maximum simultaneous connections (does not impact SQLite)
+  sqlite:
+    # Relative paths resolve under the plugin data folder.
+    file: "community.db" # SQLite file name or absolute path

@@ -1,17 +1,15 @@
 package dev.pgm.community.moderation.services;
 
-import co.aikar.idb.DB;
-import co.aikar.idb.DbRow;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Lists;
+import dev.pgm.community.database.DatabaseExecutor;
 import dev.pgm.community.feature.SQLFeatureBase;
 import dev.pgm.community.moderation.ModerationConfig;
 import dev.pgm.community.moderation.punishments.Punishment;
 import dev.pgm.community.moderation.punishments.PunishmentType;
 import dev.pgm.community.moderation.punishments.types.ExpirablePunishment;
-import dev.pgm.community.utils.DatabaseUtils;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -51,7 +49,7 @@ public class SQLModerationService extends SQLFeatureBase<Punishment, String>
       punishments.getPunishments().add(punishment);
     }
 
-    DB.executeUpdateAsync(
+    DatabaseExecutor.executeUpdateAsync(
         INSERT_PUNISHMENT_QUERY,
         punishment.getId().toString(),
         punishment.getTargetId().toString(),
@@ -74,38 +72,11 @@ public class SQLModerationService extends SQLFeatureBase<Punishment, String>
     if (punishments.isLoaded()) {
       return CompletableFuture.completedFuture(punishments.getPunishments());
     } else {
-      return DB.getResultsAsync(SELECT_PUNISHMENTS_QUERY, playerId.toString())
+      return DatabaseExecutor.queryAsync(
+              SELECT_PUNISHMENTS_QUERY, row -> mapPunishment(row, playerId), playerId.toString())
           .thenApplyAsync(results -> {
             if (results != null && !results.isEmpty()) {
-              for (DbRow row : results) {
-                String id = row.getString("id");
-                String issuer = row.getString("issuer");
-                String reason = row.getString("reason");
-                String type = row.getString("type");
-                long time = DatabaseUtils.parseLong(row, "time");
-                long expires = DatabaseUtils.parseLong(row, "expires");
-                Duration length =
-                    Duration.between(Instant.ofEpochMilli(time), Instant.ofEpochMilli(expires));
-                boolean active = DatabaseUtils.parseBoolean(row, "active");
-                long lastUpdateTime = DatabaseUtils.parseLong(row, "last_updated");
-                String lastUpdateBy = row.getString("updated_by");
-                String service = row.getString("service");
-
-                punishments
-                    .getPunishments()
-                    .add(Punishment.of(
-                        UUID.fromString(id),
-                        playerId,
-                        parseIssuer(issuer),
-                        reason,
-                        time,
-                        length,
-                        PunishmentType.valueOf(type.toUpperCase()),
-                        active,
-                        lastUpdateTime,
-                        parseIssuer(lastUpdateBy),
-                        service));
-              }
+              punishments.getPunishments().addAll(results);
             }
 
             punishments.setLoaded(true);
@@ -117,37 +88,16 @@ public class SQLModerationService extends SQLFeatureBase<Punishment, String>
 
   public CompletableFuture<List<Punishment>> queryActiveForLogin(String target) {
     UUID playerId = UUID.fromString(target);
-    return DB.getResultsAsync(SELECT_ACTIVE_PUNISHMENTS_QUERY, playerId.toString(), true)
+    return DatabaseExecutor.queryAsync(
+            SELECT_ACTIVE_PUNISHMENTS_QUERY,
+            row -> mapActivePunishment(row, playerId),
+            playerId.toString(),
+            true)
         .thenApplyAsync(results -> {
-          List<Punishment> activePunishments = Lists.newArrayList();
-          if (results != null && !results.isEmpty()) {
-            for (DbRow row : results) {
-              String id = row.getString("id");
-              String issuer = row.getString("issuer");
-              String reason = row.getString("reason");
-              String type = row.getString("type");
-              long time = DatabaseUtils.parseLong(row, "time");
-              long expires = DatabaseUtils.parseLong(row, "expires");
-              Duration length =
-                  Duration.between(Instant.ofEpochMilli(time), Instant.ofEpochMilli(expires));
-              boolean active = DatabaseUtils.parseBoolean(row, "active");
-              String punishmentService = row.getString("service");
-
-              activePunishments.add(Punishment.of(
-                  UUID.fromString(id),
-                  playerId,
-                  parseIssuer(issuer),
-                  reason,
-                  time,
-                  length,
-                  PunishmentType.valueOf(type.toUpperCase()),
-                  active,
-                  time,
-                  null,
-                  punishmentService));
-            }
+          if (results == null) {
+            return Lists.newArrayList();
           }
-          return activePunishments;
+          return results;
         });
   }
 
@@ -186,7 +136,7 @@ public class SQLModerationService extends SQLFeatureBase<Punishment, String>
 
   public CompletableFuture<Boolean> pardon(UUID id, @Nullable UUID issuer) {
     punishmentCache.invalidate(id);
-    return DB.executeUpdateAsync(
+    return DatabaseExecutor.executeUpdateAsync(
             PARDON_QUERY + MULTI_PARDON_TYPE,
             false,
             Instant.now().toEpochMilli(),
@@ -201,7 +151,7 @@ public class SQLModerationService extends SQLFeatureBase<Punishment, String>
 
   public CompletableFuture<Boolean> deactivate(UUID id, PunishmentType punishmentType) {
     punishmentCache.invalidate(id);
-    return DB.executeUpdateAsync(
+    return DatabaseExecutor.executeUpdateAsync(
             DEACTIVATE_QUERY + SINGLE_PARDON_TYPE,
             false,
             true,
@@ -213,7 +163,7 @@ public class SQLModerationService extends SQLFeatureBase<Punishment, String>
   public CompletableFuture<Boolean> unmute(UUID id, @Nullable UUID issuer) {
     punishmentCache.invalidate(id);
 
-    return DB.executeUpdateAsync(
+    return DatabaseExecutor.executeUpdateAsync(
             PARDON_QUERY + SINGLE_PARDON_TYPE,
             false,
             Instant.now().toEpochMilli(),
@@ -258,41 +208,16 @@ public class SQLModerationService extends SQLFeatureBase<Punishment, String>
   }
 
   public CompletableFuture<List<Punishment>> getRecentPunishments(Duration period) {
-    return DB.getResultsAsync(
-            SELECT_RECENT_QUERY, Instant.now().toEpochMilli() - period.toMillis(), RECENT_LIMIT)
+    return DatabaseExecutor.queryAsync(
+            SELECT_RECENT_QUERY,
+            this::mapRecentPunishment,
+            Instant.now().toEpochMilli() - period.toMillis(),
+            RECENT_LIMIT)
         .thenApplyAsync(results -> {
           List<Punishment> punishments = Lists.newArrayList();
-
           if (results != null && !results.isEmpty()) {
-            for (DbRow row : results) {
-              String id = row.getString("id");
-              String target = row.getString("punished");
-              String issuer = row.getString("issuer");
-              String reason = row.getString("reason");
-              String type = row.getString("type");
-              long time = Long.parseLong(row.getString("time"));
-              long expires = Long.parseLong(row.getString("expires"));
-              Duration length =
-                  Duration.between(Instant.ofEpochMilli(time), Instant.ofEpochMilli(expires));
-              boolean active = row.get("active");
-              long lastUpdateTime = Long.parseLong(row.getString("last_updated"));
-              String lastUpdateBy = row.getString("updated_by");
-              String service = row.getString("service");
-              punishments.add(Punishment.of(
-                  UUID.fromString(id),
-                  UUID.fromString(target),
-                  parseIssuer(issuer),
-                  reason,
-                  time,
-                  length,
-                  PunishmentType.valueOf(type.toUpperCase()),
-                  active,
-                  lastUpdateTime,
-                  parseIssuer(lastUpdateBy),
-                  service));
-            }
+            punishments.addAll(results);
           }
-
           return punishments;
         });
   }
@@ -330,5 +255,86 @@ public class SQLModerationService extends SQLFeatureBase<Punishment, String>
     public void setLoaded(boolean loaded) {
       this.loaded = loaded;
     }
+  }
+
+  private Punishment mapPunishment(java.sql.ResultSet row, UUID playerId)
+      throws java.sql.SQLException {
+    String id = row.getString("id");
+    String issuer = row.getString("issuer");
+    String reason = row.getString("reason");
+    String type = row.getString("type");
+    long time = row.getLong("time");
+    long expires = row.getLong("expires");
+    Duration length = Duration.between(Instant.ofEpochMilli(time), Instant.ofEpochMilli(expires));
+    boolean active = row.getBoolean("active");
+    long lastUpdateTime = row.getLong("last_updated");
+    String lastUpdateBy = row.getString("updated_by");
+    String service = row.getString("service");
+
+    return Punishment.of(
+        UUID.fromString(id),
+        playerId,
+        parseIssuer(issuer),
+        reason,
+        time,
+        length,
+        PunishmentType.valueOf(type.toUpperCase()),
+        active,
+        lastUpdateTime,
+        parseIssuer(lastUpdateBy),
+        service);
+  }
+
+  private Punishment mapActivePunishment(java.sql.ResultSet row, UUID playerId)
+      throws java.sql.SQLException {
+    String id = row.getString("id");
+    String issuer = row.getString("issuer");
+    String reason = row.getString("reason");
+    String type = row.getString("type");
+    long time = row.getLong("time");
+    long expires = row.getLong("expires");
+    Duration length = Duration.between(Instant.ofEpochMilli(time), Instant.ofEpochMilli(expires));
+    boolean active = row.getBoolean("active");
+    String service = row.getString("service");
+
+    return Punishment.of(
+        UUID.fromString(id),
+        playerId,
+        parseIssuer(issuer),
+        reason,
+        time,
+        length,
+        PunishmentType.valueOf(type.toUpperCase()),
+        active,
+        time,
+        null,
+        service);
+  }
+
+  private Punishment mapRecentPunishment(java.sql.ResultSet row) throws java.sql.SQLException {
+    String id = row.getString("id");
+    String target = row.getString("punished");
+    String issuer = row.getString("issuer");
+    String reason = row.getString("reason");
+    String type = row.getString("type");
+    long time = row.getLong("time");
+    long expires = row.getLong("expires");
+    Duration length = Duration.between(Instant.ofEpochMilli(time), Instant.ofEpochMilli(expires));
+    boolean active = row.getBoolean("active");
+    long lastUpdateTime = row.getLong("last_updated");
+    String lastUpdateBy = row.getString("updated_by");
+    String service = row.getString("service");
+    return Punishment.of(
+        UUID.fromString(id),
+        UUID.fromString(target),
+        parseIssuer(issuer),
+        reason,
+        time,
+        length,
+        PunishmentType.valueOf(type.toUpperCase()),
+        active,
+        lastUpdateTime,
+        parseIssuer(lastUpdateBy),
+        service);
   }
 }

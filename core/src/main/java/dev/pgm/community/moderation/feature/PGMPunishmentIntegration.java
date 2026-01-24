@@ -26,11 +26,11 @@ import tc.oc.pgm.spawns.events.ObserverKitApplyEvent;
 
 public class PGMPunishmentIntegration implements PunishmentIntegration, Listener {
 
-  private ModerationFeatureBase moderation;
+  private ModerationFeature moderation;
 
   private ModerationTools tools;
 
-  public PGMPunishmentIntegration(ModerationFeatureBase moderation) {
+  public PGMPunishmentIntegration(ModerationFeature moderation) {
     this.moderation = moderation;
     this.tools = new ModerationTools(moderation.getModerationConfig());
   }
@@ -79,17 +79,15 @@ public class PGMPunishmentIntegration implements PunishmentIntegration, Listener
 
       if (punishment != null) {
         Duration elasped = Duration.between(punishment.getTimeIssued(), Instant.now());
-        Duration remaining = moderation.getModerationConfig().getMatchBanDuration().minus(elasped);
-        Component reason =
-            text()
-                .append(text("You are banned from this match for "))
-                .append(duration(remaining, NamedTextColor.YELLOW))
-                .hoverEvent(
-                    HoverEvent.showText(
-                        text()
-                            .append(text("Reason: ", NamedTextColor.AQUA))
-                            .append(text(punishment.getReason(), NamedTextColor.GRAY))))
-                .build();
+        Duration remaining =
+            moderation.getModerationConfig().getMatchBanDuration().minus(elasped);
+        Component reason = text()
+            .append(text("You are banned from this match for "))
+            .append(duration(remaining, NamedTextColor.YELLOW))
+            .hoverEvent(HoverEvent.showText(text()
+                .append(text("Reason: ", NamedTextColor.AQUA))
+                .append(text(punishment.getReason(), NamedTextColor.GRAY))))
+            .build();
         event.cancel(reason);
       }
     }

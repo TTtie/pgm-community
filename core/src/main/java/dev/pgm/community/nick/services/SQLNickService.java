@@ -1,14 +1,13 @@
 package dev.pgm.community.nick.services;
 
-import co.aikar.idb.DB;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import dev.pgm.community.database.DatabaseExecutor;
 import dev.pgm.community.feature.SQLFeatureBase;
 import dev.pgm.community.nick.Nick;
 import dev.pgm.community.nick.NickConfig;
 import dev.pgm.community.nick.NickImpl;
-import dev.pgm.community.utils.DatabaseUtils;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -36,7 +35,7 @@ public class SQLNickService extends SQLFeatureBase<Nick, String> implements Nick
       nickInfo.setNick(nick);
     }
 
-    DB.executeUpdateAsync(
+    DatabaseExecutor.executeUpdateAsync(
         INSERT_NICKNAME_QUERY,
         nick.getPlayerId().toString(),
         nick.getName(),
@@ -57,14 +56,19 @@ public class SQLNickService extends SQLFeatureBase<Nick, String> implements Nick
     if (nick.isLoaded()) {
       return CompletableFuture.completedFuture(nick.getNick());
     } else {
-      return DB.getFirstRowAsync(SELECT_NICKNAME_BY_ID_QUERY, playerId.toString())
-          .thenApplyAsync(row -> {
-            if (row != null) {
-              String nickName = row.getString("nickname");
-              long time = DatabaseUtils.parseLong(row, "date");
-              Instant date = Instant.ofEpochMilli(time);
-              boolean enabled = DatabaseUtils.parseBoolean(row, "enabled");
-              nick.setNick(new NickImpl(playerId, nickName, date, enabled));
+      return DatabaseExecutor.queryFirstAsync(
+              SELECT_NICKNAME_BY_ID_QUERY,
+              row -> {
+                String nickName = row.getString("nickname");
+                long time = row.getLong("date");
+                Instant date = Instant.ofEpochMilli(time);
+                boolean enabled = row.getBoolean("enabled");
+                return new NickImpl(playerId, nickName, date, enabled);
+              },
+              playerId.toString())
+          .thenApplyAsync(result -> {
+            if (result != null) {
+              nick.setNick(result);
             }
             nick.setLoaded(true);
             return nick.getNick();
@@ -73,7 +77,7 @@ public class SQLNickService extends SQLFeatureBase<Nick, String> implements Nick
   }
 
   public CompletableFuture<Boolean> update(Nick nick) {
-    return DB.executeUpdateAsync(
+    return DatabaseExecutor.executeUpdateAsync(
             UPDATE_NICKNAME_QUERY,
             nick.getName(),
             nick.isEnabled(),
@@ -87,15 +91,16 @@ public class SQLNickService extends SQLFeatureBase<Nick, String> implements Nick
   }
 
   public CompletableFuture<Nick> queryByName(String name) {
-    return DB.getFirstRowAsync(SELECT_NICKNAME_BY_NAME_QUERY, name).thenApplyAsync(row -> {
-      if (row == null) return null;
-
-      UUID playerId = UUID.fromString(row.getString("playerId"));
-      String nickName = row.getString("nickname");
-      Instant date = Instant.ofEpochMilli(Long.parseLong(row.getString("date")));
-      boolean enabled = row.get("enabled");
-      return new NickImpl(playerId, nickName, date, enabled);
-    });
+    return DatabaseExecutor.queryFirstAsync(
+        SELECT_NICKNAME_BY_NAME_QUERY,
+        row -> {
+          UUID playerId = UUID.fromString(row.getString("playerId"));
+          String nickName = row.getString("nickname");
+          Instant date = Instant.ofEpochMilli(row.getLong("date"));
+          boolean enabled = row.getBoolean("enabled");
+          return new NickImpl(playerId, nickName, date, enabled);
+        },
+        name);
   }
 
   private class NickInfo {

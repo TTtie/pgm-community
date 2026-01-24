@@ -1,4 +1,4 @@
-package dev.pgm.community.assistance.feature;
+package dev.pgm.community.assistance.feature.types;
 
 import static net.kyori.adventure.text.Component.space;
 import static net.kyori.adventure.text.Component.text;
@@ -6,13 +6,16 @@ import static net.kyori.adventure.text.Component.translatable;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.collect.Lists;
 import dev.pgm.community.CommunityPermissions;
 import dev.pgm.community.assistance.AssistanceRequest;
 import dev.pgm.community.assistance.AssistanceRequest.RequestType;
 import dev.pgm.community.assistance.PlayerHelpRequest;
 import dev.pgm.community.assistance.Report;
 import dev.pgm.community.assistance.ReportConfig;
+import dev.pgm.community.assistance.feature.AssistanceFeature;
 import dev.pgm.community.assistance.menu.ReportCategoryMenu;
+import dev.pgm.community.assistance.store.AssistanceStore;
 import dev.pgm.community.events.PlayerHelpRequestEvent;
 import dev.pgm.community.events.PlayerPunishmentEvent;
 import dev.pgm.community.events.PlayerReportEvent;
@@ -22,6 +25,7 @@ import dev.pgm.community.network.subs.types.AssistanceSubscriber;
 import dev.pgm.community.network.updates.types.AssistUpdate;
 import dev.pgm.community.users.feature.UsersFeature;
 import dev.pgm.community.utils.BroadcastUtils;
+import dev.pgm.community.utils.NameUtils;
 import dev.pgm.community.utils.NetworkUtils;
 import dev.pgm.community.utils.Sounds;
 import fr.minuskube.inv.InventoryManager;
@@ -40,6 +44,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.configuration.Configuration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.jetbrains.annotations.Nullable;
@@ -47,52 +52,59 @@ import tc.oc.pgm.util.Audience;
 import tc.oc.pgm.util.bukkit.BukkitUtils;
 import tc.oc.pgm.util.named.NameStyle;
 
-public abstract class AssistanceFeatureBase extends FeatureBase implements AssistanceFeature {
+public class AssistanceFeatureCore extends FeatureBase implements AssistanceFeature {
 
   private final NetworkFeature network;
-  protected final UsersFeature users;
+  private final UsersFeature users;
   private final InventoryManager inventory;
+  private final AssistanceStore store;
 
-  protected final Cache<UUID, Instant> cooldown;
-  protected final Cache<Report, Instant> recentReports;
-  protected final Cache<PlayerHelpRequest, Instant> recentHelp;
+  private final Cache<UUID, Instant> cooldown;
+  private final Cache<Report, Instant> recentReports;
+  private final Cache<PlayerHelpRequest, Instant> recentHelp;
 
-  public AssistanceFeatureBase(
-      ReportConfig config,
+  public AssistanceFeatureCore(
+      Configuration config,
       Logger logger,
-      String featureName,
-      NetworkFeature network,
       UsersFeature users,
-      InventoryManager inventory) {
-    super(config, logger, featureName);
-    cooldown = CacheBuilder.newBuilder()
-        .expireAfterWrite(config.getCooldown(), TimeUnit.SECONDS)
+      NetworkFeature network,
+      InventoryManager inventory,
+      AssistanceStore store) {
+    super(new ReportConfig(config), logger, "Assistance");
+    this.cooldown = CacheBuilder.newBuilder()
+        .expireAfterWrite(getReportConfig().getCooldown(), TimeUnit.SECONDS)
         .build();
     this.recentReports = CacheBuilder.newBuilder()
-        .expireAfterWrite(config.getReportExpireTime().getSeconds(), TimeUnit.SECONDS)
+        .expireAfterWrite(getReportConfig().getReportExpireTime().getSeconds(), TimeUnit.SECONDS)
         .build();
     this.recentHelp = CacheBuilder.newBuilder()
-        .expireAfterWrite(config.getReportExpireTime().getSeconds(), TimeUnit.SECONDS)
+        .expireAfterWrite(getReportConfig().getReportExpireTime().getSeconds(), TimeUnit.SECONDS)
         .build();
     this.network = network;
     this.users = users;
     this.inventory = inventory;
+    this.store = store;
 
-    if (config.isEnabled()) {
+    if (getConfig().isEnabled()) {
       enable();
       network.registerSubscriber(new AssistanceSubscriber(this, network.getNetworkId(), logger));
     }
   }
 
-  protected ReportConfig getReportConfig() {
+  private ReportConfig getReportConfig() {
     return (ReportConfig) getConfig();
+  }
+
+  @Override
+  public void enable() {
+    super.enable();
   }
 
   private boolean isCooldownEnabled() {
     return getReportConfig().getCooldown() > 0;
   }
 
-  protected boolean isPersistent() {
+  private boolean isPersistent() {
     return getReportConfig().isPersistent();
   }
 
@@ -162,7 +174,29 @@ public abstract class AssistanceFeatureBase extends FeatureBase implements Assis
     // Reset cooldown
     startCooldown(sender);
 
+    if (isPersistent()) {
+      store.save(report);
+    }
     return report;
+  }
+
+  @Override
+  public CompletableFuture<List<Report>> query(String target) {
+    if (NameUtils.isMinecraftName(target)) {
+      // CONVERT TO UUID if username
+      return users
+          .getStoredId(target)
+          .thenApplyAsync(uuid -> uuid.isPresent()
+              ? store.queryList(uuid.get().toString()).join()
+              : Lists.newArrayList());
+    }
+
+    return store.queryList(target);
+  }
+
+  @Override
+  public CompletableFuture<Integer> count() {
+    return store.count();
   }
 
   @Override
@@ -196,6 +230,11 @@ public abstract class AssistanceFeatureBase extends FeatureBase implements Assis
       invalidate(request.getTargetId());
     }
     broadcastRequest(request);
+  }
+
+  @Override
+  public void invalidate(UUID playerId) {
+    store.invalidate(playerId);
   }
 
   @EventHandler

@@ -1,4 +1,4 @@
-package dev.pgm.community.requests.feature;
+package dev.pgm.community.requests.feature.types;
 
 import static dev.pgm.community.utils.MessageUtils.formatTokenTransaction;
 import static dev.pgm.community.utils.PGMUtils.getCurrentMap;
@@ -20,9 +20,12 @@ import dev.pgm.community.party.MapParty;
 import dev.pgm.community.requests.RequestConfig;
 import dev.pgm.community.requests.RequestProfile;
 import dev.pgm.community.requests.SponsorRequest;
+import dev.pgm.community.requests.feature.RequestFeature;
+import dev.pgm.community.requests.feature.SponsorVotingBookCreator;
 import dev.pgm.community.requests.menu.SponsorMenu;
 import dev.pgm.community.requests.sponsor.SponsorComponents;
 import dev.pgm.community.requests.sponsor.SponsorManager;
+import dev.pgm.community.requests.store.RequestStore;
 import dev.pgm.community.requests.supervotes.SuperVoteManager;
 import dev.pgm.community.users.feature.UsersFeature;
 import dev.pgm.community.utils.BroadcastUtils;
@@ -34,6 +37,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -44,6 +48,7 @@ import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
+import org.bukkit.configuration.Configuration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -66,34 +71,32 @@ import tc.oc.pgm.util.TimeUtils;
 import tc.oc.pgm.util.named.MapNameStyle;
 import tc.oc.pgm.util.named.NameStyle;
 
-public abstract class RequestFeatureBase extends FeatureBase implements RequestFeature {
+public class RequestFeatureCore extends FeatureBase implements RequestFeature {
 
   // Multiplier for minimum score to allow sponsoring
   private static final double MIN_SCORE_MUL = 0.35;
 
-  private Cache<UUID, MapInfo> requests;
-
-  private Cache<UUID, Instant> cooldown;
-
-  private SponsorVotingBookCreator bookCreator;
-
-  private SponsorManager sponsor;
-
-  private SuperVoteManager superVotes;
+  private final RequestStore store;
+  private final Cache<UUID, MapInfo> requests;
+  private final Cache<UUID, Instant> cooldown;
+  private final SponsorVotingBookCreator bookCreator;
+  private final SponsorManager sponsor;
+  private final SuperVoteManager superVotes;
 
   private boolean accepting;
 
-  public RequestFeatureBase(
-      RequestConfig config, Logger logger, String featureName, UsersFeature users) {
-    super(config, logger, "Requests (" + featureName + ")");
+  public RequestFeatureCore(
+      Configuration config, Logger logger, UsersFeature users, RequestStore store) {
+    super(new RequestConfig(config), logger, "Requests");
     this.requests =
         CacheBuilder.newBuilder().expireAfterWrite(1, TimeUnit.HOURS).build();
     this.cooldown = CacheBuilder.newBuilder()
-        .expireAfterWrite(config.getCooldown().getSeconds(), TimeUnit.SECONDS)
+        .expireAfterWrite(getRequestConfig().getCooldown().getSeconds(), TimeUnit.SECONDS)
         .build();
     this.bookCreator = new SponsorVotingBookCreator(this);
-    this.sponsor = new SponsorManager(this, config);
-    this.superVotes = new SuperVoteManager(config, logger);
+    this.sponsor = new SponsorManager(this, getRequestConfig());
+    this.superVotes = new SuperVoteManager(getRequestConfig(), logger);
+    this.store = store;
 
     if (getConfig().isEnabled() && PGMUtils.isPGMEnabled()) {
       enable();
@@ -103,6 +106,26 @@ public abstract class RequestFeatureBase extends FeatureBase implements RequestF
 
   public RequestConfig getRequestConfig() {
     return (RequestConfig) getConfig();
+  }
+
+  @Override
+  public CompletableFuture<RequestProfile> onLogin(PlayerJoinEvent event) {
+    return store.login(event.getPlayer().getUniqueId());
+  }
+
+  @Override
+  public void update(RequestProfile profile) {
+    store.update(profile);
+  }
+
+  @Override
+  public CompletableFuture<RequestProfile> getRequestProfile(UUID playerId) {
+    return store.query(playerId.toString());
+  }
+
+  @Override
+  public RequestProfile getCached(UUID playerId) {
+    return store.getCached(playerId);
   }
 
   @Override
