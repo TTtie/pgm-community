@@ -29,12 +29,7 @@ public class SQLSessionStore implements SessionStore {
   }
 
   @Override
-  public void endOngoingSessions() {
-    service.endOngoingSessions();
-  }
-
-  @Override
-  public void endOngoingSessionsSync() {
-    service.endOngoingSessionsSync();
+  public void updateSessionEndTimeSync(Session session) {
+    service.updateSessionEndTimeSync(session);
   }
 }

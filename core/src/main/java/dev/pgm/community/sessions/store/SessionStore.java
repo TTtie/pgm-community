@@ -12,7 +12,5 @@ public interface SessionStore {
 
   void updateSessionEndTime(Session session);
 
-  void endOngoingSessions();
-
-  void endOngoingSessionsSync();
+  void updateSessionEndTimeSync(Session session);
 }

@@ -11,10 +11,10 @@ import dev.pgm.community.users.feature.UsersFeature;
 import dev.pgm.community.utils.PGMUtils;
 import dev.pgm.community.utils.VisibilityUtils;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -29,16 +29,16 @@ import tc.oc.pgm.restart.RestartCountdown;
 public class SessionFeatureCore extends FeatureBase implements SessionFeature {
 
   private final SessionStore store;
-  private List<UUID> joiningPlayers;
+  private final Map<UUID, Session> activeSessions;
   private VanishedSessionListener vanishedSessionListener;
   private boolean serverRestarting;
 
   public SessionFeatureCore(UsersFeature users, Logger logger, SessionStore store) {
     super(users.getConfig(), logger, "Sessions");
     this.store = store;
+    this.activeSessions = new ConcurrentHashMap<>();
 
     if (getConfig().isEnabled()) {
-      this.joiningPlayers = new ArrayList<>();
       enable();
 
       if (PGMUtils.isPGMEnabled()) {
@@ -50,6 +50,7 @@ public class SessionFeatureCore extends FeatureBase implements SessionFeature {
 
   @Override
   public void disable() {
+    super.disable();
     if (vanishedSessionListener != null) HandlerList.unregisterAll(vanishedSessionListener);
     endOngoingSessionsSync();
   }
@@ -60,8 +61,14 @@ public class SessionFeatureCore extends FeatureBase implements SessionFeature {
   }
 
   @Override
+  public Session getActiveSession(UUID playerId) {
+    return activeSessions.get(playerId);
+  }
+
+  @Override
   public Session startSession(Player player) {
     Session session = new Session(player.getUniqueId(), VisibilityUtils.isDisguised(player));
+    activeSessions.put(player.getUniqueId(), session);
     store.save(session);
 
     return session;
@@ -75,34 +82,42 @@ public class SessionFeatureCore extends FeatureBase implements SessionFeature {
 
   @Override
   public void endOngoingSessions() {
-    store.endOngoingSessions();
+    Instant now = Instant.now();
+    for (Session session : activeSessions.values()) {
+      session.setEndDate(now);
+      store.updateSessionEndTime(session);
+    }
+    activeSessions.clear();
   }
 
   @Override
   public void endOngoingSessionsSync() {
-    store.endOngoingSessionsSync();
-  }
-
-  @EventHandler(priority = EventPriority.LOWEST)
-  public void onJoinLowest(PlayerJoinEvent event) {
-    joiningPlayers.add(event.getPlayer().getUniqueId());
+    Instant now = Instant.now();
+    for (Session session : activeSessions.values()) {
+      session.setEndDate(now);
+      store.updateSessionEndTimeSync(session);
+    }
+    activeSessions.clear();
   }
 
   @EventHandler(priority = EventPriority.HIGHEST)
   public void onJoinHighest(PlayerJoinEvent event) {
     if (!serverRestarting) startSession(event.getPlayer());
-    joiningPlayers.remove(event.getPlayer().getUniqueId());
   }
 
   @EventHandler(priority = EventPriority.HIGHEST)
   public void onQuitHighest(PlayerQuitEvent event) {
-    if (!serverRestarting)
-      getLatestSession(event.getPlayer().getUniqueId(), false).thenAcceptAsync(this::endSession);
+    if (serverRestarting) return;
+
+    Session session = activeSessions.remove(event.getPlayer().getUniqueId());
+    if (session != null) {
+      endSession(session);
+    }
   }
 
   @Override
   public boolean isPlayerJoining(Player player) {
-    return joiningPlayers.contains(player.getUniqueId());
+    return !activeSessions.containsKey(player.getUniqueId());
   }
 
   @EventHandler

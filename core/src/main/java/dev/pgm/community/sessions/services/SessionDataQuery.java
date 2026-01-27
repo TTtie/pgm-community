@@ -12,9 +12,6 @@ public interface SessionDataQuery {
   static final String UPDATE_SESSION_ENDTIME_QUERY =
       "UPDATE " + TABLE_NAME + " SET end_time = ? WHERE id = ?";
 
-  static final String UPDATE_ONGOING_SESSION_ENDING_QUERY =
-      "UPDATE " + TABLE_NAME + " SET end_time = ? WHERE server = ? AND end_time IS NULL";
-
   static final String LATEST_TABLE_NAME = "latest_sessions";
   static final String LATEST_TABLE_FIELDS =
       "(player VARCHAR(36), ignore_disguised BOOL, session_id VARCHAR(36), disguised BOOL, server VARCHAR(32), start_time BIGINT, end_time BIGINT, PRIMARY KEY (player, ignore_disguised))";
@@ -24,7 +21,4 @@ public interface SessionDataQuery {
 
   static final String UPDATE_LATEST_ENDTIME_QUERY =
       "UPDATE " + LATEST_TABLE_NAME + " SET end_time = ? WHERE session_id = ?";
-
-  static final String UPDATE_LATEST_ONGOING_SESSION_ENDING_QUERY =
-      "UPDATE " + LATEST_TABLE_NAME + " SET end_time = ? WHERE server = ? AND end_time IS NULL";
 }

@@ -10,6 +10,8 @@ public interface SessionFeature extends Feature {
 
   CompletableFuture<Session> getLatestSession(UUID playerId, boolean ignoreDisguised);
 
+  Session getActiveSession(UUID playerId);
+
   Session startSession(Player player);
 
   void endSession(Session session);
@@ -18,7 +20,5 @@ public interface SessionFeature extends Feature {
 
   void endOngoingSessions();
 
-  default void endOngoingSessionsSync() {
-    endOngoingSessions();
-  }
+  void endOngoingSessionsSync();
 }

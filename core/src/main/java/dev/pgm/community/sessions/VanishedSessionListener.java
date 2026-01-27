@@ -19,12 +19,10 @@ public class VanishedSessionListener implements Listener {
     Player player = event.getPlayer().getBukkit();
     if (sessions.isPlayerJoining(player)) return;
 
-    sessions
-        .getLatestSession(player.getUniqueId(), false)
-        .thenAcceptAsync(
-            session -> {
-              sessions.endSession(session);
-              sessions.startSession(player);
-            });
+    Session session = sessions.getActiveSession(player.getUniqueId());
+    if (session != null) {
+      sessions.endSession(session);
+    }
+    sessions.startSession(player);
   }
 }

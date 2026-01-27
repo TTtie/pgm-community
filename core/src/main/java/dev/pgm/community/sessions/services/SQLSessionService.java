@@ -90,30 +90,20 @@ public class SQLSessionService extends SQLFeatureBase<Session, SessionQuery>
         session.getSessionId().toString());
   }
 
-  public void endOngoingSessions() {
-    DatabaseExecutor.executeUpdateAsync(
-        UPDATE_ONGOING_SESSION_ENDING_QUERY,
-        Instant.now().toEpochMilli(),
-        Community.get().getServerId());
-    DatabaseExecutor.executeUpdateAsync(
-        UPDATE_LATEST_ONGOING_SESSION_ENDING_QUERY,
-        Instant.now().toEpochMilli(),
-        Community.get().getServerId());
-  }
-
-  public void endOngoingSessionsSync() {
-    long now = Instant.now().toEpochMilli();
+  public void updateSessionEndTimeSync(Session session) {
+    Long endTime = session.getEndDate() == null ? null : session.getEndDate().toEpochMilli();
     try {
       DatabaseExecutor.executeUpdateAsync(
-              UPDATE_ONGOING_SESSION_ENDING_QUERY, now, Community.get().getServerId())
+              UPDATE_SESSION_ENDTIME_QUERY, endTime, session.getSessionId().toString())
           .join();
       DatabaseExecutor.executeUpdateAsync(
-              UPDATE_LATEST_ONGOING_SESSION_ENDING_QUERY, now, Community.get().getServerId())
+              UPDATE_LATEST_ENDTIME_QUERY, endTime, session.getSessionId().toString())
           .join();
     } catch (Exception exception) {
       Community.get()
           .getLogger()
-          .warning("Failed to end ongoing sessions during shutdown: " + exception.getMessage());
+          .warning(
+              "Failed to end session " + session.getSessionId() + ": " + exception.getMessage());
     }
   }
 
