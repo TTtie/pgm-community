@@ -11,11 +11,12 @@ java {
 }
 
 repositories {
-    mavenLocal()
     mavenCentral()
     maven("https://repo.pgm.fyi/snapshots") // Sportpaper & other pgm-specific stuff
+    maven("https://repo.papermc.io/repository/maven-public/") // PaperMC repo
     maven("https://hub.spigotmc.org/nexus/content/repositories/snapshots/") // Spigot repo
     maven("https://repo.aikar.co/content/groups/aikar/") // aikar repo
+    mavenLocal() // Local last
 }
 
 dependencies {
