@@ -10,8 +10,10 @@ import java.util.List;
 import org.bukkit.ServerLinks;
 import org.bukkit.craftbukkit.CraftServerLinks;
 import org.bukkit.entity.Player;
+import org.jetbrains.annotations.NotNullByDefault;
 
 @Supports(PAPER)
+@NotNullByDefault
 public class ModernServerLinksPlatform implements ServerLinksFeature.ServerLinksPlatform {
   @Override
   public void sendToPlayer(Player player, List<ServerLink> serverLinks) {
@@ -24,6 +26,7 @@ public class ModernServerLinksPlatform implements ServerLinksFeature.ServerLinks
       if (link.builtinType() != null) {
         bukkitLinks.addLink(toBukkitType(link.builtinType()), link.uri());
       } else {
+        assert link.customText() != null;
         bukkitLinks.addLink(link.customText(), link.uri());
       }
     }

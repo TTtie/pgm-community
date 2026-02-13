@@ -7,8 +7,10 @@ import dev.pgm.community.serverlinks.types.ServerLink;
 import dev.pgm.community.util.Supports;
 import java.util.List;
 import org.bukkit.entity.Player;
+import org.jetbrains.annotations.NotNullByDefault;
 
 @Supports(SPORTPAPER)
+@NotNullByDefault
 public class SpServerLinksPlatform implements ServerLinksFeature.ServerLinksPlatform {
   private static final boolean HAS_VIA = hasVia();
 

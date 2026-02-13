@@ -12,7 +12,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.bukkit.configuration.Configuration;
+import org.jetbrains.annotations.NotNullByDefault;
+import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
+@NotNullByDefault
 public class ServerLinksConfig extends FeatureConfigImpl {
   private static final String KEY = "server-links";
   private static final String LINKS_KEY = "links";
@@ -21,13 +25,14 @@ public class ServerLinksConfig extends FeatureConfigImpl {
   private static final String LINK_CUSTOM_TEXT_KEY = "text";
   private static final String LINK_URI_KEY = "uri";
 
-  private List<ServerLink> links;
+  private @Nullable @Unmodifiable List<ServerLink> links;
 
   public ServerLinksConfig(Configuration config) {
     super(KEY, config);
   }
 
-  public List<ServerLink> getLinks() {
+  public @Unmodifiable List<ServerLink> getLinks() {
+    assert links != null;
     return links;
   }
 

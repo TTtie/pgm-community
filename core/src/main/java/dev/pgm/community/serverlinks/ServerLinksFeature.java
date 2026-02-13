@@ -9,7 +9,9 @@ import org.bukkit.configuration.Configuration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.jetbrains.annotations.NotNullByDefault;
 
+@NotNullByDefault
 public class ServerLinksFeature extends FeatureBase {
   private static final ServerLinksPlatform PLATFORM = Platform.get(ServerLinksPlatform.class);
 

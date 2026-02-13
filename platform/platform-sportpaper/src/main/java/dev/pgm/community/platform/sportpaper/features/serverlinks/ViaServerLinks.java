@@ -1,5 +1,7 @@
 package dev.pgm.community.platform.sportpaper.features.serverlinks;
 
+import static tc.oc.pgm.util.Assert.assertNotNull;
+
 import com.viaversion.nbt.tag.Tag;
 import com.viaversion.viaversion.api.Via;
 import com.viaversion.viaversion.api.connection.UserConnection;
@@ -15,7 +17,9 @@ import java.util.List;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
 import org.bukkit.entity.Player;
+import org.jetbrains.annotations.NotNullByDefault;
 
+@NotNullByDefault
 public class ViaServerLinks {
   private static final Protocol<?, ?, ?, ?> serverLinkProtocol = findServerLinkProtocol();
 
@@ -37,12 +41,12 @@ public class ViaServerLinks {
     var packetType = packetTypes.get(State.PLAY).typeByName("SERVER_LINKS");
     PacketWrapper packet = PacketWrapper.create(packetType, conn);
     packet.write(Types.VAR_INT, links.size());
-    // TODO: is there a better way to do this?
     for (ServerLink link : links) {
       packet.write(Types.BOOLEAN, link.builtinType() != null);
       if (link.builtinType() != null) {
         packet.write(Types.VAR_INT, link.builtinType().ordinal());
       } else {
+        assert link.customText() != null;
         packet.write(Types.TAG, toViaTag(link.customText()));
       }
       packet.write(Types.STRING, link.uri().toString());
@@ -52,13 +56,17 @@ public class ViaServerLinks {
   }
 
   private static Tag toViaTag(Component component) {
-    return JsonNbtConverter.toNbt(
-        JsonParser.parseString(GsonComponentSerializer.gson().serialize(component)));
+    return assertNotNull(
+        JsonNbtConverter.toNbt(
+            JsonParser.parseString(GsonComponentSerializer.gson().serialize(component))),
+        "Component -> NBT conversion failed");
   }
 
   private static Protocol<?, ?, ?, ?> findServerLinkProtocol() {
-    return Via.getManager()
-        .getProtocolManager()
-        .getProtocol(/* to */ ProtocolVersion.v1_21, /* from */ ProtocolVersion.v1_20_5);
+    return assertNotNull(
+        Via.getManager()
+            .getProtocolManager()
+            .getProtocol(/* to */ ProtocolVersion.v1_21, /* from */ ProtocolVersion.v1_20_5),
+        "ViaVersion v1.20.5 -> v1.21 protocol was not found");
   }
 }

@@ -2,6 +2,8 @@ package dev.pgm.community.serverlinks.types;
 
 import java.net.URI;
 import net.kyori.adventure.text.Component;
+import org.jetbrains.annotations.NotNullByDefault;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Represents a Minecraft server link.
@@ -10,4 +12,6 @@ import net.kyori.adventure.text.Component;
  * @param customText The custom text for the server link, or null if builtinType is set.
  * @param uri The URI of the server link.
  */
-public record ServerLink(ServerLinkBuiltinType builtinType, Component customText, URI uri) {}
+@NotNullByDefault
+public record ServerLink(
+    @Nullable ServerLinkBuiltinType builtinType, @Nullable Component customText, URI uri) {}
