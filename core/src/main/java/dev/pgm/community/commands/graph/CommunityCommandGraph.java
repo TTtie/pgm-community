@@ -1,6 +1,7 @@
 package dev.pgm.community.commands.graph;
 
 import dev.pgm.community.Community;
+import dev.pgm.community.alts.AltRiskLevel;
 import dev.pgm.community.assistance.commands.PlayerHelpCommand;
 import dev.pgm.community.assistance.commands.ReportCommands;
 import dev.pgm.community.broadcast.BroadcastCommand;
@@ -93,6 +94,7 @@ public class CommunityCommandGraph extends CommandGraph<Community> {
   @Override
   protected void setupParsers() {
     registerParser(MapInfo.class, MapInfoParser::new);
+    registerParser(AltRiskLevel.class, new EnumParser<>(AltRiskLevel.class));
     registerParser(MapPartyType.class, new EnumParser<>(MapPartyType.class));
     registerParser(MutationType.class, new EnumParser<>(MutationType.class));
     registerParser(PollThreshold.class, new EnumParser<>(PollThreshold.class));

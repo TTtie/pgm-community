@@ -371,6 +371,37 @@ history:
   # Set to true to enable match history, false to disable.
   enabled: true
 
+# Alt Risk - Highlights likely ban-evasion alts for staff review.
+alt-risk:
+  enabled: true
+  medium-threshold: 30
+  high-threshold: 60
+  cache-duration: "3m"
+  recent-ban-window: "7d"
+  join-after-ban-window: "30m"
+  relay-window: "20m"
+  fresh-account-join-count: 5
+
+  weights:
+    # Joining player's current IP directly matches a banned account's known IPs
+    direct-ban-evasion: 60
+    # Joining player shares their current (latest) IP with a linked account
+    shared-current-ip: 40
+    # Joining player shares at least one historical IP with a linked account
+    shared-known-ip: 25
+    # Joining player shares more than one historical IP with a linked account (stacks with above)
+    multiple-shared-ips: 10
+    # Joining player's session started within join-after-ban-window of a linked account being banned
+    joined-after-ban: 30
+    # Joining player's session started within relay-window of a linked account's last activity
+    relayed-session: 15
+    # A linked account currently has an active ban
+    linked-active-ban: 20
+    # A linked account was banned within recent-ban-window
+    linked-recent-ban: 10
+    # Joining player has very few joins and already scores above medium-threshold
+    fresh-account-linked: 10
+
 # Network - Features which help in running Community on multiple servers
 network:
   enabled: false  

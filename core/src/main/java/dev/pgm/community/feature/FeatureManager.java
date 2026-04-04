@@ -1,5 +1,6 @@
 package dev.pgm.community.feature;
 
+import dev.pgm.community.alts.feature.AltRiskFeature;
 import dev.pgm.community.assistance.feature.AssistanceFeature;
 import dev.pgm.community.assistance.feature.types.AssistanceFeatureCore;
 import dev.pgm.community.audit.CommandAuditFeature;
@@ -48,6 +49,7 @@ public class FeatureManager {
   private final NickFeature nick;
   private final RequestFeature requests;
   private final SessionFeature sessions;
+  private final AltRiskFeature altRisk;
 
   private final TeleportFeature teleports;
   private final InfoCommandsFeature infoCommands;
@@ -79,6 +81,7 @@ public class FeatureManager {
     this.friends = new FriendshipFeatureCore(config, logger, users, stores.friends());
     this.nick = new NickFeatureCore(config, logger, users, stores.nicks());
     this.requests = new RequestFeatureCore(config, logger, users, stores.requests());
+    this.altRisk = new AltRiskFeature(config, logger, users, sessions, moderation);
 
     // TODO: 1. Support non-sql databases?
     // Ex. FileReportFeature, MongoReportFeature, RedisReportFeature...
@@ -115,6 +118,10 @@ public class FeatureManager {
 
   public SessionFeature getSessions() {
     return sessions;
+  }
+
+  public AltRiskFeature getAltRisk() {
+    return altRisk;
   }
 
   public TeleportFeature getTeleports() {
@@ -191,6 +198,7 @@ public class FeatureManager {
     getModeration().getConfig().reload(config);
     getUsers().getConfig().reload(config);
     getSessions().getConfig().reload(config);
+    getAltRisk().getConfig().reload(config);
     getTeleports().getConfig().reload(config);
     getInfoCommands().getConfig().reload(config);
     getChatManagement().getConfig().reload(config);
@@ -218,6 +226,7 @@ public class FeatureManager {
     if (getModeration().isEnabled()) getModeration().disable();
     if (getUsers().isEnabled()) getUsers().disable();
     if (getSessions().isEnabled()) getSessions().disable();
+    if (getAltRisk().isEnabled()) getAltRisk().disable();
     if (getTeleports().isEnabled()) getTeleports().disable();
     if (getInfoCommands().isEnabled()) getInfoCommands().disable();
     if (getChatManagement().isEnabled()) getChatManagement().disable();

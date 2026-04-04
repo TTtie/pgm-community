@@ -33,7 +33,6 @@ import dev.pgm.community.utils.BroadcastUtils;
 import dev.pgm.community.utils.CommandAudience;
 import dev.pgm.community.utils.NameUtils;
 import dev.pgm.community.utils.PGMUtils;
-import dev.pgm.community.utils.Sounds;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
@@ -63,7 +62,6 @@ import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
 import org.bukkit.event.player.AsyncPlayerPreLoginEvent.Result;
-import org.bukkit.event.player.PlayerJoinEvent;
 import org.jspecify.annotations.Nullable;
 import tc.oc.pgm.util.Audience;
 import tc.oc.pgm.util.named.NameStyle;
@@ -557,22 +555,10 @@ public class ModerationFeatureCore extends FeatureBase implements ModerationFeat
     this.onPreLogin(event);
   }
 
-  @EventHandler(priority = EventPriority.MONITOR)
-  public void onPlayerJoinEvasionCheck(PlayerJoinEvent event) {
-    String host = event.getPlayer().getAddress().getAddress().getHostAddress();
-    Optional<UUID> banEvasion = isBanEvasion(host);
-    boolean exclude = hasRecentPardon(event.getPlayer().getUniqueId());
-
-    if (banEvasion.isPresent() && !exclude) {
-      users.renderUsername(banEvasion, NameStyle.FANCY).thenAcceptAsync(bannedName -> {
-        if (!banEvasion.get().equals(event.getPlayer().getUniqueId())) {
-          BroadcastUtils.sendAdminChatMessage(
-              PunishmentFormats.formatBanEvasion(event.getPlayer(), banEvasion.get(), bannedName),
-              Sounds.BAN_EVASION,
-              CommunityPermissions.UNBAN);
-        }
-      });
-    }
+  @Override
+  public Optional<UUID> getBanEvasionMatch(UUID playerId, String address) {
+    if (hasRecentPardon(playerId)) return Optional.empty();
+    return isBanEvasion(address).filter(bannedId -> !bannedId.equals(playerId));
   }
 
   // Cancel chat for muted/banned players

@@ -131,6 +131,8 @@ public interface ModerationFeature extends Feature {
 
   Optional<MutePunishment> getCachedMute(UUID playerId);
 
+  Optional<UUID> getBanEvasionMatch(UUID playerId, String address);
+
   ModerationConfig getModerationConfig();
 
   @Nullable

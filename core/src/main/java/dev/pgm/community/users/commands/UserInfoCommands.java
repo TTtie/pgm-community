@@ -14,10 +14,17 @@ import com.google.common.collect.Sets;
 import dev.pgm.community.Community;
 import dev.pgm.community.CommunityCommand;
 import dev.pgm.community.CommunityPermissions;
+import dev.pgm.community.alts.AltRiskLevel;
+import dev.pgm.community.alts.AltRiskLinkedAccount;
+import dev.pgm.community.alts.AltRiskSignal;
+import dev.pgm.community.alts.AltRiskSummary;
+import dev.pgm.community.alts.feature.AltRiskFeature;
 import dev.pgm.community.commands.player.TargetPlayer;
 import dev.pgm.community.friends.feature.FriendshipFeature;
 import dev.pgm.community.moderation.feature.ModerationFeature;
 import dev.pgm.community.moderation.punishments.Punishment;
+import dev.pgm.community.sessions.Session;
+import dev.pgm.community.users.UserProfile;
 import dev.pgm.community.users.feature.UsersFeature;
 import dev.pgm.community.utils.BroadcastUtils;
 import dev.pgm.community.utils.CommandAudience;
@@ -37,6 +44,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -57,11 +65,13 @@ public class UserInfoCommands extends CommunityCommand {
   private final UsersFeature users;
   private final ModerationFeature moderation;
   private final FriendshipFeature friends;
+  private final AltRiskFeature altRisk;
 
   public UserInfoCommands() {
     this.users = Community.get().getFeatures().getUsers();
     this.moderation = Community.get().getFeatures().getModeration();
     this.friends = Community.get().getFeatures().getFriendships();
+    this.altRisk = Community.get().getFeatures().getAltRisk();
   }
 
   @Command("seen|lastseen|find <target>")
@@ -192,102 +202,255 @@ public class UserInfoCommands extends CommunityCommand {
     });
   }
 
-  @Command("profile|user <target> [all]")
+  @Command("altscore <target> [allSignals] [allAccounts]")
+  @CommandDescription("Analyze alt-evasion risk for a player")
+  @Permission(CommunityPermissions.LOOKUP_OTHERS)
+  public void viewAltScore(
+      CommandAudience audience,
+      @Argument("target") TargetPlayer target,
+      @Argument("allSignals") @Default("false") boolean allSignals,
+      @Argument("allAccounts") @Default("false") boolean allAccounts) {
+    if (!altRisk.isEnabled()) {
+      audience.sendWarning(text("Alt risk analysis is not enabled", NamedTextColor.RED));
+      return;
+    }
+
+    users.getStoredProfile(target.getIdentifier()).thenAcceptAsync(profile -> {
+      if (profile == null) {
+        audience.sendWarning(MessageUtils.formatUnseen(target.getIdentifier()));
+        return;
+      }
+
+      altRisk.analyze(profile.getId()).thenAcceptAsync(summary -> {
+        Component header = text("Alt Risk", NamedTextColor.RED)
+            .append(text(" - ", NamedTextColor.GRAY))
+            .append(player(profile.getId(), NameStyle.FANCY))
+            .append(text(" (", NamedTextColor.GRAY))
+            .append(text(summary.score(), summary.effectiveColor()))
+            .append(text(")", NamedTextColor.GRAY));
+
+        audience.sendMessage(TextFormatter.horizontalLineHeading(
+            audience.getSender(), header, NamedTextColor.DARK_GRAY));
+        audience.sendMessage(formatInfoField(
+            "Risk Level",
+            text(summary.level().name(), summary.effectiveColor())
+                .hoverEvent(HoverEvent.showText(
+                    text(riskLevelDescription(summary), NamedTextColor.GRAY)))));
+        audience.sendMessage(
+            formatInfoField("Signals", text(summary.signals().size(), NamedTextColor.YELLOW)));
+        audience.sendMessage(formatInfoField(
+            "Linked Accounts", text(summary.linkedAccounts().size(), NamedTextColor.YELLOW)));
+
+        if (summary.signals().isEmpty()) {
+          audience.sendMessage(formatInfoField(
+              "Assessment", text("No strong alt-evasion signals detected", NamedTextColor.GREEN)));
+          return;
+        }
+
+        int signalLimit = 3;
+        audience.sendMessage(formatInfoField(allSignals ? "All Signals" : "Top Signals", empty()));
+        audience.sendMessage(formatListItems(summary.signals().stream()
+            .limit(allSignals ? Long.MAX_VALUE : signalLimit)
+            .map(this::formatSignal)
+            .collect(Collectors.toList())));
+        if (!allSignals && summary.signals().size() > signalLimit) {
+          audience.sendMessage(text()
+              .append(text("     "))
+              .append(text("[", NamedTextColor.GRAY))
+              .append(
+                  text("View all " + summary.signals().size() + " signals", NamedTextColor.YELLOW))
+              .append(text("]", NamedTextColor.GRAY))
+              .clickEvent(
+                  ClickEvent.runCommand("/altscore " + target.getIdentifier() + " true false"))
+              .hoverEvent(
+                  HoverEvent.showText(text("Click to view all signals", NamedTextColor.GRAY)))
+              .build());
+        }
+
+        if (!summary.linkedAccounts().isEmpty()) {
+          int accountLimit = 3;
+          audience.sendMessage(formatInfoField(
+              allAccounts ? "All Linked Accounts" : "Likely Linked Accounts", empty()));
+          audience.sendMessage(formatListItems(summary.linkedAccounts().stream()
+              .limit(allAccounts ? Long.MAX_VALUE : accountLimit)
+              .map(account -> formatLinkedAccount(
+                  account,
+                  summary.signals().stream()
+                      .filter(s -> s.linkedAccountId().equals(account.accountId()))
+                      .collect(Collectors.toList())))
+              .collect(Collectors.toList())));
+          if (!allAccounts && summary.linkedAccounts().size() > accountLimit) {
+            audience.sendMessage(text()
+                .append(text("     "))
+                .append(text("[", NamedTextColor.GRAY))
+                .append(text(
+                    "View all " + summary.linkedAccounts().size() + " accounts",
+                    NamedTextColor.YELLOW))
+                .append(text("]", NamedTextColor.GRAY))
+                .clickEvent(
+                    ClickEvent.runCommand("/altscore " + target.getIdentifier() + " false true"))
+                .hoverEvent(HoverEvent.showText(
+                    text("Click to view all linked accounts", NamedTextColor.GRAY)))
+                .build());
+          }
+        }
+      });
+    });
+  }
+
+  @Command("profile|user <target> [all] [analyze]")
   @CommandDescription("View account info for a player")
   @Permission(CommunityPermissions.LOOKUP_OTHERS)
   public void viewUserProfile(
       CommandAudience audience,
       @Argument("target") TargetPlayer target,
-      @Argument("all") @Default("false") boolean viewAll) {
+      @Argument("all") @Default("false") boolean viewAll,
+      @Argument("analyze") @Default("false") boolean analyze) {
     users.findUserWithSession(target.getIdentifier(), false, (profile, session) -> {
       if (profile == null || session == null) {
         audience.sendWarning(MessageUtils.formatUnseen(target.getIdentifier()));
         return;
       }
 
-      Component header = text("Account Info", NamedTextColor.RED)
-          .append(text(" - ", NamedTextColor.GRAY))
-          .append(player(profile.getId(), NameStyle.FANCY));
-
-      Component uuid =
-          formatInfoField("UUID", text(profile.getId().toString(), NamedTextColor.YELLOW));
-      Component firstLogin =
-          formatInfoField("First Login", formatDateWithHover(profile.getFirstLogin()));
-      Component lastLogin =
-          formatInfoField("Last Login", formatDateWithHover(session.getLatestUpdateDate()));
-      Component joinCount =
-          formatInfoField("Join Count", text(profile.getJoinCount(), NamedTextColor.LIGHT_PURPLE));
-
-      Component lastServer =
-          formatInfoField("Last Server", text(session.getServerName(), NamedTextColor.AQUA));
-
-      Component knownIPs = formatInfoField("Known IPs", empty());
-
-      audience.sendMessage(TextFormatter.horizontalLineHeading(
-          audience.getSender(), header, NamedTextColor.DARK_GRAY));
-
-      audience.sendMessage(uuid);
-      audience.sendMessage(firstLogin);
-      audience.sendMessage(lastLogin);
-      audience.sendMessage(joinCount);
-      audience.sendMessage(lastServer);
-
-      if (audience.getSender().hasPermission(CommunityPermissions.RESTRICTED)) {
-        users.getLatestAddress(profile.getId()).thenAcceptAsync(latest -> {
-          final String lastIpFieldName = "Latest IP";
-
-          if (latest == null) {
-            audience.sendMessage(formatInfoField(
-                lastIpFieldName,
-                text("Unavailable", NamedTextColor.RED)
-                    .hoverEvent(HoverEvent.showText(text(
-                        "No IP info found (user has not logged in recently)",
-                        NamedTextColor.RED)))));
-          } else {
-            audience.sendMessage(formatInfoField(
-                lastIpFieldName,
-                text()
-                    .append(text(latest.getAddress(), NamedTextColor.AQUA))
-                    .append(text(" ("))
-                    .append(relativePastApproximate(latest.getDate()))
-                    .append(text(")"))
-                    .color(NamedTextColor.GRAY)
-                    .build()));
-          }
-        });
-
-        users.getKnownIPs(profile.getId()).thenAcceptAsync(ips -> {
-          if (ips.size() > 1) {
-            final int MAX_VIEWABLE = 6;
-            List<String> viewableIps = Lists.newArrayList(ips);
-            if (!viewAll) {
-              viewableIps = viewableIps.subList(0, Math.min(ips.size(), MAX_VIEWABLE));
-            }
-            audience.sendMessage(
-                knownIPs.append(text("(" + ips.size() + ")", NamedTextColor.GRAY)));
-            audience.sendMessage(formatListItems(viewableIps.stream()
-                .map(ip -> text()
-                    .append(text("     - ", NamedTextColor.YELLOW))
-                    .append(text(ip, NamedTextColor.DARK_AQUA))
-                    .build())
-                .collect(Collectors.toList())));
-            if (ips.size() > MAX_VIEWABLE && !viewAll) {
-              audience.sendMessage(text()
-                  .append(
-                      text(ips.size() - MAX_VIEWABLE, NamedTextColor.YELLOW, TextDecoration.BOLD))
-                  .append(text(" Additional IPs found! ", NamedTextColor.DARK_AQUA))
-                  .append(text("[", NamedTextColor.GRAY))
-                  .append(text("View All", NamedTextColor.BLUE))
-                  .append(text("]", NamedTextColor.GRAY))
-                  .clickEvent(ClickEvent.runCommand("/profile " + target.getIdentifier() + " true"))
-                  .hoverEvent(
-                      HoverEvent.showText(text("Click to view all ips", NamedTextColor.GRAY)))
-                  .build());
-            }
-          }
-        });
+      if (analyze && altRisk.isEnabled()) {
+        altRisk
+            .analyze(profile.getId())
+            .thenAcceptAsync(
+                ignored -> displayProfile(audience, target, profile, session, viewAll));
+      } else {
+        displayProfile(audience, target, profile, session, viewAll);
       }
     });
+  }
+
+  private void displayProfile(
+      CommandAudience audience,
+      TargetPlayer target,
+      UserProfile profile,
+      Session session,
+      boolean viewAll) {
+    Component header = text("Account Info", NamedTextColor.RED)
+        .append(text(" - ", NamedTextColor.GRAY))
+        .append(player(profile.getId(), NameStyle.FANCY));
+
+    Component uuid =
+        formatInfoField("UUID", text(profile.getId().toString(), NamedTextColor.YELLOW));
+    Component firstLogin =
+        formatInfoField("First Login", formatDateWithHover(profile.getFirstLogin()));
+    Component lastLogin =
+        formatInfoField("Last Login", formatDateWithHover(session.getLatestUpdateDate()));
+    Component joinCount =
+        formatInfoField("Join Count", text(profile.getJoinCount(), NamedTextColor.LIGHT_PURPLE));
+    Component lastServer =
+        formatInfoField("Last Server", text(session.getServerName(), NamedTextColor.AQUA));
+    Component knownIPs = formatInfoField("Known IPs", empty());
+
+    audience.sendMessage(TextFormatter.horizontalLineHeading(
+        audience.getSender(), header, NamedTextColor.DARK_GRAY));
+
+    audience.sendMessage(uuid);
+    audience.sendMessage(firstLogin);
+    audience.sendMessage(lastLogin);
+    audience.sendMessage(joinCount);
+    audience.sendMessage(lastServer);
+
+    if (altRisk.isEnabled()) {
+      audience.sendMessage(formatInfoField("Alt Risk", formatAltRiskField(target, profile)));
+    }
+
+    if (audience.getSender().hasPermission(CommunityPermissions.RESTRICTED)) {
+      users.getLatestAddress(profile.getId()).thenAcceptAsync(latest -> {
+        final String lastIpFieldName = "Latest IP";
+
+        if (latest == null) {
+          audience.sendMessage(formatInfoField(
+              lastIpFieldName,
+              text("Unavailable", NamedTextColor.RED)
+                  .hoverEvent(HoverEvent.showText(text(
+                      "No IP info found (user has not logged in recently)", NamedTextColor.RED)))));
+        } else {
+          audience.sendMessage(formatInfoField(
+              lastIpFieldName,
+              text()
+                  .append(text(latest.getAddress(), NamedTextColor.AQUA))
+                  .append(text(" ("))
+                  .append(relativePastApproximate(latest.getDate()))
+                  .append(text(")"))
+                  .color(NamedTextColor.GRAY)
+                  .build()));
+        }
+      });
+
+      users.getKnownIPs(profile.getId()).thenAcceptAsync(ips -> {
+        if (ips.size() > 1) {
+          final int MAX_VIEWABLE = 6;
+          List<String> viewableIps = Lists.newArrayList(ips);
+          if (!viewAll) {
+            viewableIps = viewableIps.subList(0, Math.min(ips.size(), MAX_VIEWABLE));
+          }
+          audience.sendMessage(knownIPs.append(text("(" + ips.size() + ")", NamedTextColor.GRAY)));
+          audience.sendMessage(formatListItems(viewableIps.stream()
+              .map(ip -> text()
+                  .append(text("     - ", NamedTextColor.YELLOW))
+                  .append(text(ip, NamedTextColor.DARK_AQUA))
+                  .build())
+              .collect(Collectors.toList())));
+          if (ips.size() > MAX_VIEWABLE && !viewAll) {
+            audience.sendMessage(text()
+                .append(text(ips.size() - MAX_VIEWABLE, NamedTextColor.YELLOW, TextDecoration.BOLD))
+                .append(text(" Additional IPs found! ", NamedTextColor.DARK_AQUA))
+                .append(text("[", NamedTextColor.GRAY))
+                .append(text("View All", NamedTextColor.BLUE))
+                .append(text("]", NamedTextColor.GRAY))
+                .clickEvent(ClickEvent.runCommand("/profile " + target.getIdentifier() + " true"))
+                .hoverEvent(HoverEvent.showText(text("Click to view all ips", NamedTextColor.GRAY)))
+                .build());
+          }
+        }
+      });
+    }
+  }
+
+  private String riskLevelDescription(AltRiskSummary summary) {
+    if (!summary.requiresReview()) {
+      return switch (summary.level()) {
+        case HIGH -> "High number of linked accounts detected, but none are banned.";
+        case MEDIUM -> "Some linked accounts detected, but none are banned.";
+        case LOW -> "Minimal links detected. No connection to any banned account.";
+      };
+    }
+    return switch (summary.level()) {
+      case HIGH ->
+        "Strong evidence that this account is evading a ban. Immediate review recommended.";
+      case MEDIUM ->
+        "Some signals suggest a possible connection to a banned account. Review advised.";
+      case LOW -> "Weak connection to a banned account detected.";
+    };
+  }
+
+  private Component formatAltRiskField(TargetPlayer target, UserProfile profile) {
+    AltRiskSummary cached = altRisk.getCachedSummary(profile.getId());
+
+    if (cached != null && cached.level() != AltRiskLevel.LOW) {
+      return text()
+          .append(text(cached.level().name(), cached.effectiveColor()))
+          .append(text(" (", NamedTextColor.GRAY))
+          .append(text(cached.score(), cached.effectiveColor()))
+          .append(text(")", NamedTextColor.GRAY))
+          .clickEvent(ClickEvent.runCommand("/altscore " + profile.getUsername()))
+          .hoverEvent(
+              HoverEvent.showText(text("Click to view full alt risk report", NamedTextColor.GRAY)))
+          .build();
+    }
+
+    return text()
+        .append(text("[", NamedTextColor.GRAY))
+        .append(text("Analyze", NamedTextColor.GREEN))
+        .append(text("]", NamedTextColor.GRAY))
+        .clickEvent(ClickEvent.runCommand("/profile " + target.getIdentifier() + " false true"))
+        .hoverEvent(
+            HoverEvent.showText(text("Click to run alt risk analysis", NamedTextColor.GRAY)))
+        .build();
   }
 
   private Component formatDateWithHover(Instant pastDate) {
@@ -310,6 +473,66 @@ public class UserInfoCommands extends CommunityCommand {
         .append(text(": ", NamedTextColor.WHITE))
         .append(value)
         .build();
+  }
+
+  private Component formatSignal(AltRiskSignal signal) {
+    TextComponent.Builder builder = text()
+        .append(text("     +" + signal.weight(), NamedTextColor.GOLD))
+        .append(text(" " + signal.message(), NamedTextColor.GRAY));
+
+    if (signal.evidenceTime() != null) {
+      builder.hoverEvent(HoverEvent.showText(text("Evidence: ", NamedTextColor.GRAY)
+          .append(relativePastApproximate(signal.evidenceTime()).color(NamedTextColor.YELLOW))));
+    }
+
+    return builder.build();
+  }
+
+  private Component formatLinkedAccount(
+      AltRiskLinkedAccount linkedAccount, List<AltRiskSignal> signals) {
+    Component name =
+        users.renderUsername(linkedAccount.accountId(), NameStyle.FANCY).join();
+
+    TextComponent.Builder scoreBreakdown =
+        text().append(text("Score Breakdown", NamedTextColor.GOLD, TextDecoration.BOLD));
+    for (AltRiskSignal signal : signals) {
+      scoreBreakdown
+          .append(newline())
+          .append(text("  +" + signal.weight() + " ", NamedTextColor.GOLD))
+          .append(text(signal.message(), NamedTextColor.GRAY));
+    }
+
+    Component score = text()
+        .append(text("(", NamedTextColor.GRAY))
+        .append(text(linkedAccount.scoreContribution(), NamedTextColor.GOLD))
+        .append(text(")", NamedTextColor.GRAY))
+        .hoverEvent(HoverEvent.showText(scoreBreakdown.build()))
+        .build();
+
+    TextComponent.Builder details = text()
+        .append(text("     - ", NamedTextColor.YELLOW))
+        .append(name.clickEvent(ClickEvent.runCommand("/l " + linkedAccount.accountId()))
+            .hoverEvent(HoverEvent.showText(
+                text("Click to view punishment history of ", NamedTextColor.GRAY)
+                    .append(name))))
+        .append(text(" "))
+        .append(score);
+
+    if (linkedAccount.currentSharedIp()) {
+      details.append(text(" shared latest IP", NamedTextColor.GRAY));
+    } else if (linkedAccount.sharedIpsCount() > 0) {
+      details
+          .append(text(" shared IPs: ", NamedTextColor.GRAY))
+          .append(text(linkedAccount.sharedIpsCount(), NamedTextColor.AQUA));
+    }
+
+    if (linkedAccount.activeBan()) {
+      details.append(text(" active ban", NamedTextColor.RED));
+    } else if (linkedAccount.joinedAfterPunishment()) {
+      details.append(text(" post-ban join", NamedTextColor.GOLD));
+    }
+
+    return details.build();
   }
 
   private void showOnlineAlts(CommandAudience audience, int page) {
