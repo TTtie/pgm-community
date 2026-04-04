@@ -107,7 +107,7 @@ public class ReportCommands extends CommunityCommand {
     Component headerResultCount = text(Long.toString(reportData.size()), NamedTextColor.RED);
 
     int perPage = 7;
-    int pages = (reportData.size() + perPage - 1) / perPage;
+    int pages = Math.max(1, (reportData.size() + perPage - 1) / perPage);
     page = Math.clamp(page, 1, pages);
 
     Component pageNum = translatable(

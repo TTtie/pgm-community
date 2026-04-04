@@ -29,6 +29,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
@@ -68,7 +69,14 @@ public class PunishmentCommand extends CommunityCommand {
       @Flag(value = "time", aliases = "l") Duration length) {
     moderation
         .getRecentPunishments(length != null ? length : Duration.ofHours(1))
-        .thenAcceptAsync(punishments -> sendPunishmentHistory(audience, null, punishments, page));
+        .thenAcceptAsync(punishments -> sendPunishmentHistory(audience, null, punishments, page))
+        .exceptionally(ex -> {
+          Community.get()
+              .getLogger()
+              .log(Level.WARNING, "Failed to load recent punishment history", ex);
+          audience.sendWarning(text("Failed to load punishment history", NamedTextColor.RED));
+          return null;
+        });
   }
 
   @Command("repeatpunishment|rp <target>")
@@ -150,7 +158,17 @@ public class PunishmentCommand extends CommunityCommand {
     moderation
         .query(target.getIdentifier())
         .thenAcceptAsync(punishments ->
-            sendPunishmentHistory(audience, target.getIdentifier(), punishments, page));
+            sendPunishmentHistory(audience, target.getIdentifier(), punishments, page))
+        .exceptionally(ex -> {
+          Community.get()
+              .getLogger()
+              .log(
+                  Level.WARNING,
+                  "Failed to load punishment history for " + target.getIdentifier(),
+                  ex);
+          audience.sendWarning(text("Failed to load punishment history", NamedTextColor.RED));
+          return null;
+        });
   }
 
   public void sendPunishmentHistory(
@@ -158,7 +176,7 @@ public class PunishmentCommand extends CommunityCommand {
     Component headerResultCount = text(Long.toString(punishmentData.size()), NamedTextColor.RED);
 
     int perPage = 7;
-    int pages = (punishmentData.size() + perPage - 1) / perPage;
+    int pages = Math.max(1, (punishmentData.size() + perPage - 1) / perPage);
     page = Math.clamp(page, 1, pages);
 
     Component pageNum = translatable(
@@ -189,7 +207,7 @@ public class PunishmentCommand extends CommunityCommand {
       public Component format(Punishment data, int index) {
         TextComponent.Builder builder = text();
 
-        // Punishments that can be removed (bans / mutes), show a small status indicator
+        // Punishments that can be removed (bans / mutes) show a small status indicator
         if (data.getType().canRescind()) {
           Component status = data.isActive() ? MessageUtils.ACCEPT : MessageUtils.DENY;
           builder

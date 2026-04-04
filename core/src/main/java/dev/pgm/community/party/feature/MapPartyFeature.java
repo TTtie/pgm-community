@@ -670,7 +670,7 @@ public class MapPartyFeature extends FeatureBase {
     Component headerResultCount = text(Long.toString(entries.size()), NamedTextColor.DARK_GREEN);
 
     int perPage = 7;
-    int pages = (entries.size() + perPage - 1) / perPage;
+    int pages = Math.max(1, (entries.size() + perPage - 1) / perPage);
     page = Math.clamp(page, 1, pages);
 
     Component pageNum = text()

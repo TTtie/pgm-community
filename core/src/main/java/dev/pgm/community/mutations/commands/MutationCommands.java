@@ -45,7 +45,7 @@ public class MutationCommands extends CommunityCommand {
       Component headerResultCount = text(Integer.toString(mts.size()), NamedTextColor.DARK_GREEN);
 
       int perPage = 7;
-      int pages = (mts.size() + perPage - 1) / perPage;
+      int pages = Math.max(1, (mts.size() + perPage - 1) / perPage);
       page = Math.clamp(page, 1, pages);
 
       NamedTextColor featureColor = NamedTextColor.DARK_GREEN;

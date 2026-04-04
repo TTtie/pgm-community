@@ -271,7 +271,7 @@ public class FriendshipCommand extends CommunityCommand {
     Component headerResultCount = text(Integer.toString(requests.size()), NamedTextColor.RED);
 
     int perPage = 9;
-    int pages = (requests.size() + perPage - 1) / perPage;
+    int pages = Math.max(1, (requests.size() + perPage - 1) / perPage);
     page = Math.clamp(page, 1, pages);
 
     NamedTextColor featureColor = NamedTextColor.YELLOW;
