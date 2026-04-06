@@ -202,7 +202,7 @@ public class UserInfoCommands extends CommunityCommand {
     });
   }
 
-  @Command("altscore <target> [allSignals] [allAccounts]")
+  @Command("altscore|altrisk <target> [allSignals] [allAccounts]")
   @CommandDescription("Analyze alt-evasion risk for a player")
   @Permission(CommunityPermissions.LOOKUP_OTHERS)
   public void viewAltScore(
@@ -236,16 +236,11 @@ public class UserInfoCommands extends CommunityCommand {
             text(summary.level().name(), summary.effectiveColor())
                 .hoverEvent(HoverEvent.showText(
                     text(riskLevelDescription(summary), NamedTextColor.GRAY)))));
+        audience.sendMessage(formatInfoField("Assessment", formatAssessment(summary)));
         audience.sendMessage(
             formatInfoField("Signals", text(summary.signals().size(), NamedTextColor.YELLOW)));
         audience.sendMessage(formatInfoField(
             "Linked Accounts", text(summary.linkedAccounts().size(), NamedTextColor.YELLOW)));
-
-        if (summary.signals().isEmpty()) {
-          audience.sendMessage(formatInfoField(
-              "Assessment", text("No strong alt-evasion signals detected", NamedTextColor.GREEN)));
-          return;
-        }
 
         int signalLimit = 3;
         audience.sendMessage(formatInfoField(allSignals ? "All Signals" : "Top Signals", empty()));
@@ -414,17 +409,38 @@ public class UserInfoCommands extends CommunityCommand {
   private String riskLevelDescription(AltRiskSummary summary) {
     if (!summary.requiresReview()) {
       return switch (summary.level()) {
-        case HIGH -> "High number of linked accounts detected, but none are banned.";
-        case MEDIUM -> "Some linked accounts detected, but none are banned.";
-        case LOW -> "Minimal links detected. No connection to any banned account.";
+        case HIGH ->
+          "Strong signs of multiple likely alts, but no recent ban-evasion signal found.";
+        case MEDIUM -> "Some signs of likely alts, but no recent ban-evasion signal found.";
+        case LOW -> "Minimal signs of likely alts. No ban-evasion signal found.";
       };
     }
     return switch (summary.level()) {
-      case HIGH ->
-        "Strong evidence that this account is evading a ban. Immediate review recommended.";
-      case MEDIUM ->
-        "Some signals suggest a possible connection to a banned account. Review advised.";
-      case LOW -> "Weak connection to a banned account detected.";
+      case HIGH -> "This looks like ban evasion.";
+      case MEDIUM -> "This may be ban evasion.";
+      case LOW -> "This is probably not ban evasion.";
+    };
+  }
+
+  private Component formatAssessment(AltRiskSummary summary) {
+    if (!summary.requiresReview()) {
+      return switch (summary.level()) {
+        case HIGH ->
+          text(
+              "Multiple alts detected, but not currently suspected of ban evasion.",
+              NamedTextColor.YELLOW);
+        case MEDIUM ->
+          text(
+              "Some alt activity detected, but not currently suspected of ban evasion.",
+              NamedTextColor.GREEN);
+        case LOW -> text("No indication of ban evasion.", NamedTextColor.GREEN);
+      };
+    }
+
+    return switch (summary.level()) {
+      case HIGH -> text("Likely ban evasion.", NamedTextColor.RED);
+      case MEDIUM -> text("Possible ban evasion.", NamedTextColor.YELLOW);
+      case LOW -> text("Probably not ban evasion.", NamedTextColor.GOLD);
     };
   }
 

@@ -156,31 +156,28 @@ public class AltRiskService {
           Optional<Punishment> latestBan = punishments.stream()
               .filter(Punishment::isBan)
               .max(Comparator.comparing(Punishment::getTimeIssued));
+          Optional<Punishment> recentBan = latestBan.filter(
+              punishment -> isWithin(punishment.getTimeIssued(), config.getRecentBanWindow()));
           boolean activeBan = latestBan.filter(Punishment::isActive).isPresent();
 
-          if (activeBan) {
+          if (recentBan.filter(Punishment::isActive).isPresent()) {
+            Punishment punishment = recentBan.get();
             score += config.getLinkedActiveBanWeight();
-            Punishment punishment = latestBan.get();
             signals.add(new AltRiskSignal(
                 AltRiskSignalType.LINKED_ACTIVE_BAN,
                 altId,
                 config.getLinkedActiveBanWeight(),
                 "Linked account currently has an active ban",
                 punishment.getTimeIssued()));
-          } else {
-            Optional<Punishment> recentBan = latestBan.filter(
-                punishment -> isWithin(punishment.getTimeIssued(), config.getRecentBanWindow()));
-
-            recentBan.ifPresent(punishment -> signals.add(new AltRiskSignal(
+          } else if (recentBan.isPresent()) {
+            Punishment punishment = recentBan.get();
+            score += config.getLinkedRecentBanWeight();
+            signals.add(new AltRiskSignal(
                 AltRiskSignalType.LINKED_RECENT_BAN,
                 altId,
                 config.getLinkedRecentBanWeight(),
                 "Linked account was banned recently",
-                punishment.getTimeIssued())));
-
-            if (recentBan.isPresent()) {
-              score += config.getLinkedRecentBanWeight();
-            }
+                punishment.getTimeIssued()));
           }
 
           boolean joinedAfterPunishment = (currentSharedIp || !sharedIps.isEmpty())
