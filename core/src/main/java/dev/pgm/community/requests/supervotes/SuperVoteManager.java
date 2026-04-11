@@ -27,6 +27,7 @@ public class SuperVoteManager {
 
   private final RequestConfig config;
   private final Set<UUID> activeSuperVoters;
+  private final Map<UUID, Integer> selectedVoteCounts;
   private boolean isVoteActive;
   private final Logger logger;
   private final Map<UUID, StoredPermission> playerPermissions;
@@ -35,6 +36,7 @@ public class SuperVoteManager {
     this.config = config;
     this.logger = logger;
     this.activeSuperVoters = Sets.newHashSet();
+    this.selectedVoteCounts = new HashMap<>();
     this.playerPermissions = new HashMap<>();
   }
 
@@ -45,10 +47,12 @@ public class SuperVoteManager {
   public void onVoteStart() {
     isVoteActive = true;
     activeSuperVoters.clear();
+    selectedVoteCounts.clear();
   }
 
   public void onVoteEnd() {
     isVoteActive = false;
+    selectedVoteCounts.clear();
     removeAllSuperVotePermissions();
   }
 
@@ -119,6 +123,21 @@ public class SuperVoteManager {
 
   public boolean isActive(Player player) {
     return this.activeSuperVoters.contains(player.getUniqueId());
+  }
+
+  public void onVoteSelectionChange(Player player, boolean add) {
+    UUID playerId = player.getUniqueId();
+
+    if (add) {
+      selectedVoteCounts.merge(playerId, 1, Integer::sum);
+      return;
+    }
+
+    selectedVoteCounts.computeIfPresent(playerId, (id, count) -> count > 1 ? count - 1 : null);
+  }
+
+  public boolean hasSelectedMap(Player player) {
+    return selectedVoteCounts.getOrDefault(player.getUniqueId(), 0) > 0;
   }
 
   private record StoredPermission(PermissionAttachment attachment, String permission) {

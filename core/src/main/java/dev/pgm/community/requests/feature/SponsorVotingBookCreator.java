@@ -61,7 +61,8 @@ public class SponsorVotingBookCreator extends VotingBookCreatorImpl {
 
     RequestProfile profile = manager.getCached(viewer.getId());
     int remaining = profile != null ? profile.getSuperVotes() : 0;
-    boolean canUse = manager.canSuperVote(viewer.getBukkit()) && remaining > 0;
+    boolean hasSelection = manager.hasSelectedMapForRunningVote(viewer.getBukkit());
+    boolean canUse = manager.canSuperVote(viewer.getBukkit()) && remaining > 0 && hasSelection;
 
     Component votePrefix = text()
         .append(MessageUtils.VOTE)
@@ -76,7 +77,7 @@ public class SponsorVotingBookCreator extends VotingBookCreatorImpl {
         .append(
             active
                 ? getSuperVoteActiveComponent()
-                : getSuperVoteButtonComponent(canUse, remaining, superLevel))
+                : getSuperVoteButtonComponent(canUse, remaining, hasSelection, superLevel))
         .appendNewline()
         .appendNewline()
         .append(getVoteMultiplierComponent(active ? superLevel : standard));
@@ -92,7 +93,8 @@ public class SponsorVotingBookCreator extends VotingBookCreatorImpl {
         .build();
   }
 
-  private Component getSuperVoteButtonComponent(boolean canUse, int balance, int multiplier) {
+  private Component getSuperVoteButtonComponent(
+      boolean canUse, int balance, boolean hasSelection, int multiplier) {
 
     Component activateHover = text()
         .append(text("Click to activate a", NamedTextColor.GRAY))
@@ -102,7 +104,7 @@ public class SponsorVotingBookCreator extends VotingBookCreatorImpl {
         .append(text("super vote!", NamedTextColor.GRAY))
         .build();
 
-    if (!canUse) {
+    if (balance < 1) {
       activateHover = text()
           .append(text("You don't have any super votes available!", NamedTextColor.GRAY))
           .appendNewline()
@@ -110,6 +112,9 @@ public class SponsorVotingBookCreator extends VotingBookCreatorImpl {
           .append(MessageUtils.getStoreLink())
           .append(text(" to purchase more.", NamedTextColor.GRAY))
           .build();
+    } else if (!hasSelection) {
+      activateHover =
+          text("Select at least one map before activating a super vote!", NamedTextColor.GRAY);
     }
 
     TextComponent.Builder builder = text()
@@ -123,7 +128,7 @@ public class SponsorVotingBookCreator extends VotingBookCreatorImpl {
 
     if (canUse) {
       builder.clickEvent(ClickEvent.runCommand("/supervote"));
-    } else {
+    } else if (balance < 1) {
       builder.clickEvent(ClickEvent.openUrl(Community.get().getServerConfig().getStoreLink()));
     }
 

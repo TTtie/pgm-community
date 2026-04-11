@@ -66,6 +66,7 @@ import tc.oc.pgm.rotation.MapPoolManager;
 import tc.oc.pgm.rotation.pools.VotingPool;
 import tc.oc.pgm.rotation.vote.MapPoll;
 import tc.oc.pgm.rotation.vote.VotePoolOptions;
+import tc.oc.pgm.rotation.vote.events.MatchPlayerVoteEvent;
 import tc.oc.pgm.util.Audience;
 import tc.oc.pgm.util.TimeUtils;
 import tc.oc.pgm.util.named.MapNameStyle;
@@ -312,6 +313,11 @@ public class RequestFeatureCore extends FeatureBase implements RequestFeature {
       return;
     }
 
+    if (!hasSelectedMapForRunningVote(player)) {
+      viewer.sendWarning(text("Select at least one map before activating a super vote!"));
+      return;
+    }
+
     getRequestProfile(player.getUniqueId()).thenAcceptAsync(profile -> {
       if (profile.getSuperVotes() < 1) {
         viewer.sendWarning(text("You don't have enough super votes!"));
@@ -432,6 +438,11 @@ public class RequestFeatureCore extends FeatureBase implements RequestFeature {
         });
       }
     }
+  }
+
+  @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+  public void onPlayerVote(MatchPlayerVoteEvent event) {
+    superVotes.onVoteSelectionChange(event.getPlayer().getBukkit(), event.isAdd());
   }
 
   @EventHandler(priority = EventPriority.LOW)
@@ -599,6 +610,11 @@ public class RequestFeatureCore extends FeatureBase implements RequestFeature {
   @Override
   public boolean canSuperVote(Player player) {
     return !isSuperVoteActive(player);
+  }
+
+  @Override
+  public boolean hasSelectedMapForRunningVote(Player player) {
+    return superVotes.isVotingActive() && superVotes.hasSelectedMap(player);
   }
 
   @Override

@@ -74,6 +74,13 @@ public interface RequestFeature extends Feature {
   boolean canSuperVote(Player player);
 
   /**
+   * Get whether the provided player has selected at least one map for the running vote
+   *
+   * @return true if the player has selected at least one map for the running vote, false if not
+   */
+  boolean hasSelectedMapForRunningVote(Player player);
+
+  /**
    * Get whether the provided player has activated a super vote
    *
    * @return true if the player has activated a super vote, false if not
