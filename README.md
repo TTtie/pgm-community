@@ -18,5 +18,11 @@ Community offers an all-in-one solution for managing Minecraft PGM server commun
 - Cross-Server Chat & Report Functionality
 - Utility Commands
 
+## Documents
+
+1. [`LICENSE`](LICENSE) - any forks or modifications to this project must be kept public.
+2. [`CODE_OF_CONDUCT`](docs/CODE_OF_CONDUCT.md) - guidelines that contributors and server owners must agree to.
+3. [`CONTRIBUTING`](docs/CONTRIBUTING.md) - how to build, compile, test, and submit changes to the project.
+
 ## Governance
 This project is maintained by [applenick](https://github.com/applenick), with assistance from [Electroid](https://github.com/Electroid) and other PGMDev developers. 
