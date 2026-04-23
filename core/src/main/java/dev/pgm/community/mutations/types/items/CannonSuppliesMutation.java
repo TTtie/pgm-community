@@ -55,7 +55,7 @@ public class CannonSuppliesMutation extends KitMutationBase {
     TNTMatchModule tntMatchModule = match.getModule(TNTMatchModule.class);
     if (tntMatchModule == null) return true;
 
-    return !tntMatchModule.getProperties().instantIgnite;
+    return !tntMatchModule.getProperties().instantIgnite();
   }
 
   @Override
