@@ -62,6 +62,8 @@ import tc.oc.pgm.util.text.TextFormatter;
 
 public class UserInfoCommands extends CommunityCommand {
 
+  private static final int MAX_ALTS_PER_MESSAGE = 12;
+
   private final UsersFeature users;
   private final ModerationFeature moderation;
   private final FriendshipFeature friends;
@@ -144,7 +146,7 @@ public class UserInfoCommands extends CommunityCommand {
         return;
       }
 
-      Set<Component> altNames = alts.stream()
+      List<Component> altNames = alts.stream()
           .map(altId -> {
             Component name = users.renderUsername(altId, NameStyle.COLOR).join();
 
@@ -156,20 +158,7 @@ public class UserInfoCommands extends CommunityCommand {
                         .append(name)))
                 .build();
           })
-          .collect(Collectors.toSet());
-
-      Component numberOfAlts = text(alts.size(), NamedTextColor.YELLOW, TextDecoration.BOLD);
-
-      Component altNameList = text()
-          .append(targetPlayer)
-          .append(text(" has "))
-          .append(numberOfAlts)
-          .append(text(" known alternate account"))
-          .append(text(alts.size() != 1 ? "s" : ""))
-          .append(text(": "))
-          .append(TextFormatter.list(altNames, NamedTextColor.GRAY))
-          .color(NamedTextColor.GRAY)
-          .build();
+          .collect(Collectors.toList());
 
       List<Component> altsWithBans = alts.stream()
           .filter(altId -> moderation.isBanned(altId.toString()).join())
@@ -186,20 +175,53 @@ public class UserInfoCommands extends CommunityCommand {
           })
           .collect(Collectors.toList());
 
-      Component numberOfBannedAlts =
-          text(altsWithBans.size(), NamedTextColor.YELLOW, TextDecoration.BOLD);
-
-      Component altBans = text()
-          .append(numberOfBannedAlts)
-          .append(text(" of these accounts are currently banned: "))
-          .append(TextFormatter.list(altsWithBans, NamedTextColor.GRAY))
-          .color(NamedTextColor.GRAY)
-          .build();
-      audience.sendMessage(altNameList);
+      sendTargetAltList(audience, targetPlayer, altNames, alts.size());
       if (!altsWithBans.isEmpty()) {
-        audience.sendMessage(altBans);
+        sendTargetBannedAltList(audience, altsWithBans);
       }
     });
+  }
+
+  private void sendTargetAltList(
+      CommandAudience audience, Component targetPlayer, List<Component> altNames, int totalAlts) {
+    List<List<Component>> chunks = Lists.partition(altNames, MAX_ALTS_PER_MESSAGE);
+
+    Component numberOfAlts = text(totalAlts, NamedTextColor.YELLOW, TextDecoration.BOLD);
+    audience.sendMessage(text()
+        .append(targetPlayer)
+        .append(text(" has "))
+        .append(numberOfAlts)
+        .append(text(" known alternate account"))
+        .append(text(totalAlts != 1 ? "s" : ""))
+        .append(text(":"))
+        .color(NamedTextColor.GRAY)
+        .build());
+
+    for (List<Component> chunk : chunks) {
+      audience.sendMessage(text()
+          .append(TextFormatter.list(chunk, NamedTextColor.GRAY))
+          .color(NamedTextColor.GRAY)
+          .build());
+    }
+  }
+
+  private void sendTargetBannedAltList(CommandAudience audience, List<Component> altsWithBans) {
+    List<List<Component>> chunks = Lists.partition(altsWithBans, MAX_ALTS_PER_MESSAGE);
+
+    Component numberOfBannedAlts =
+        text(altsWithBans.size(), NamedTextColor.YELLOW, TextDecoration.BOLD);
+    audience.sendMessage(text()
+        .append(numberOfBannedAlts)
+        .append(text(" of these accounts are currently banned:"))
+        .color(NamedTextColor.GRAY)
+        .build());
+
+    for (List<Component> chunk : chunks) {
+      audience.sendMessage(text()
+          .append(TextFormatter.list(chunk, NamedTextColor.GRAY))
+          .color(NamedTextColor.GRAY)
+          .build());
+    }
   }
 
   @Command("altscore|altrisk <target> [allSignals] [allAccounts]")
@@ -244,10 +266,12 @@ public class UserInfoCommands extends CommunityCommand {
 
         int signalLimit = 3;
         audience.sendMessage(formatInfoField(allSignals ? "All Signals" : "Top Signals", empty()));
-        audience.sendMessage(formatListItems(summary.signals().stream()
-            .limit(allSignals ? Long.MAX_VALUE : signalLimit)
-            .map(this::formatSignal)
-            .collect(Collectors.toList())));
+        sendListItems(
+            audience,
+            summary.signals().stream()
+                .limit(allSignals ? Long.MAX_VALUE : signalLimit)
+                .map(this::formatSignal)
+                .collect(Collectors.toList()));
         if (!allSignals && summary.signals().size() > signalLimit) {
           audience.sendMessage(text()
               .append(text("     "))
@@ -266,14 +290,16 @@ public class UserInfoCommands extends CommunityCommand {
           int accountLimit = 3;
           audience.sendMessage(formatInfoField(
               allAccounts ? "All Linked Accounts" : "Likely Linked Accounts", empty()));
-          audience.sendMessage(formatListItems(summary.linkedAccounts().stream()
-              .limit(allAccounts ? Long.MAX_VALUE : accountLimit)
-              .map(account -> formatLinkedAccount(
-                  account,
-                  summary.signals().stream()
-                      .filter(s -> s.linkedAccountId().equals(account.accountId()))
-                      .collect(Collectors.toList())))
-              .collect(Collectors.toList())));
+          sendListItems(
+              audience,
+              summary.linkedAccounts().stream()
+                  .limit(allAccounts ? Long.MAX_VALUE : accountLimit)
+                  .map(account -> formatLinkedAccount(
+                      account,
+                      summary.signals().stream()
+                          .filter(s -> s.linkedAccountId().equals(account.accountId()))
+                          .collect(Collectors.toList())))
+                  .collect(Collectors.toList()));
           if (!allAccounts && summary.linkedAccounts().size() > accountLimit) {
             audience.sendMessage(text()
                 .append(text("     "))
@@ -384,12 +410,14 @@ public class UserInfoCommands extends CommunityCommand {
             viewableIps = viewableIps.subList(0, Math.min(ips.size(), MAX_VIEWABLE));
           }
           audience.sendMessage(knownIPs.append(text("(" + ips.size() + ")", NamedTextColor.GRAY)));
-          audience.sendMessage(formatListItems(viewableIps.stream()
-              .map(ip -> text()
-                  .append(text("     - ", NamedTextColor.YELLOW))
-                  .append(text(ip, NamedTextColor.DARK_AQUA))
-                  .build())
-              .collect(Collectors.toList())));
+          sendListItems(
+              audience,
+              viewableIps.stream()
+                  .map(ip -> text()
+                      .append(text("     - ", NamedTextColor.YELLOW))
+                      .append(text(ip, NamedTextColor.DARK_AQUA))
+                      .build())
+                  .collect(Collectors.toList()));
           if (ips.size() > MAX_VIEWABLE && !viewAll) {
             audience.sendMessage(text()
                 .append(text(ips.size() - MAX_VIEWABLE, NamedTextColor.YELLOW, TextDecoration.BOLD))
@@ -478,8 +506,8 @@ public class UserInfoCommands extends CommunityCommand {
         .build();
   }
 
-  private Component formatListItems(Collection<Component> components) {
-    return Component.join(separator(newline()), components);
+  private void sendListItems(CommandAudience audience, Collection<Component> components) {
+    components.forEach(audience::sendMessage);
   }
 
   private Component formatInfoField(String field, Component value) {
