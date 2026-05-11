@@ -12,20 +12,32 @@ java {
 
 repositories {
     mavenCentral()
-    maven("https://repo.pgm.fyi/snapshots") // Sportpaper & other pgm-specific stuff
-    maven("https://repo.papermc.io/repository/maven-public/") // PaperMC repo
-    maven("https://hub.spigotmc.org/nexus/content/repositories/snapshots/") // Spigot repo
-    maven("https://repo.aikar.co/content/groups/aikar/") // aikar repo
+    maven("https://repo.pgm.fyi/snapshots") // SportPaper & other PGM-specific stuff
+    maven("https://repo.papermc.io/repository/maven-public/") // Paper builds & paperweight plugin
+    maven("https://repo.aikar.co/content/groups/aikar/") // Aikar repo
+    maven("https://repo.codemc.io/repository/maven-releases/") // PacketEvents
+    exclusiveContent {
+        forRepository {
+            maven("https://jitpack.io")
+        }
+        filter {
+            includeGroup("com.github.OvercastCommunity.adventure-platform")
+            includeGroup("com.github.MinusKube")
+        }
+    }
     mavenLocal() // Local last
 }
 
 dependencies {
     api("com.zaxxer:HikariCP:2.4.1") { isTransitive = false }
-    api("fr.minuskube.inv:smart-invs:1.2.7") { isTransitive = false }
+    // Latest SmartInvs commit
+    api("com.github.MinusKube:SmartInvs:9c9dbbee16") { isTransitive = false }
     api("redis.clients:jedis:3.5.1")
     api("net.kyori:adventure-api:4.26.1")
     api("net.kyori:adventure-text-serializer-plain:4.26.1")
-    api("net.kyori:adventure-platform-bukkit:4.4.1")
+    // adventure-platform fork with ViaVersion and 1.21.11+ fixes
+    // https://github.com/OvercastCommunity/adventure-platform
+    api("com.github.OvercastCommunity.adventure-platform:adventure-platform-bukkit:04de657e85")
     api("org.reflections:reflections:0.10.2")
 
     // Annotations
@@ -37,7 +49,7 @@ dependencies {
     compileOnly("tc.oc.pgm:util:0.16-SNAPSHOT")
     compileOnly("tc.oc.occ:Environment:1.0.0-SNAPSHOT")
     compileOnly("org.incendo:cloud-annotations:2.0.0")
-    compileOnly("net.dmulloy2:ProtocolLib:5.4.0")
+    compileOnly("com.github.retrooper:packetevents-spigot:2.12.0")
 
     // Paper and SportPaper include these (or equivalents)
     compileOnly("it.unimi.dsi:fastutil:8.5.15")
