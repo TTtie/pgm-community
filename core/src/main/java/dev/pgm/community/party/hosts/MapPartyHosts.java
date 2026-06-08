@@ -67,7 +67,8 @@ public class MapPartyHosts {
 
   public boolean removeSubHost(String name) {
     Entry<UUID, String> cachedEntry = nameCache.entrySet().stream()
-        .filter(e -> e.getValue().equalsIgnoreCase(name))
+        .filter(e ->
+            e.getKey().toString().equalsIgnoreCase(name) || e.getValue().equalsIgnoreCase(name))
         .findAny()
         .orElse(null);
 
