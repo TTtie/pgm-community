@@ -184,6 +184,7 @@ public class MapPartyFeature extends FeatureBase {
       case REGULAR:
         this.party = new RegularPoolParty(sender, getEventConfig());
         break;
+      case null:
       default:
         return false;
       // Catch unknown party type

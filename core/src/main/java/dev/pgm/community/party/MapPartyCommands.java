@@ -47,7 +47,7 @@ public class MapPartyCommands extends CommunityCommand {
     }
   }
 
-  @Command("create [type]")
+  @Command("create <type>")
   @Permission(CommunityPermissions.PARTY)
   public void create(
       CommandAudience viewer,
@@ -61,7 +61,7 @@ public class MapPartyCommands extends CommunityCommand {
     }
   }
 
-  @Command("preset [name]")
+  @Command("preset <name>")
   @Permission(CommunityPermissions.PARTY)
   public void createPreset(
       CommandAudience viewer,

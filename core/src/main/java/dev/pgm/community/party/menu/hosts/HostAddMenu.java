@@ -46,7 +46,7 @@ public class HostAddMenu extends PlayerSelectionProvider {
 
   @Override
   public Predicate<Player> relevantPlayerFilter() {
-    return player -> player.hasPermission(CommunityPermissions.STAFF);
+    return player -> player.hasPermission(CommunityPermissions.PARTY);
   }
 
   @Override
