@@ -432,7 +432,7 @@ public class ModerationFeatureCore extends FeatureBase implements ModerationFeat
         time.toEpochMilli(),
         getSenderId(issuer.getSender()),
         getModerationConfig().getService());
-    Bukkit.getPluginManager().callEvent(new PlayerPunishmentEvent(issuer, punishment, silent));
+    Community.get().callEvent(new PlayerPunishmentEvent(issuer, punishment, silent));
     return punishment;
   }
 

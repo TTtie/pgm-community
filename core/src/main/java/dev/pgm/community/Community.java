@@ -147,7 +147,13 @@ public class Community extends JavaPlugin {
   }
 
   public void callEvent(CommunityEvent event) {
-    getServer().getPluginManager().callEvent(event);
+    if (Bukkit.isPrimaryThread()) {
+      getServer().getPluginManager().callEvent(event);
+    } else {
+      getServer()
+          .getScheduler()
+          .runTask(this, () -> getServer().getPluginManager().callEvent(event));
+    }
   }
 
   // REMOVE WHEN NOT IN DEV
