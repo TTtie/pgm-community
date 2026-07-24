@@ -4,7 +4,6 @@ import static net.kyori.adventure.text.Component.text;
 import static tc.oc.pgm.util.text.TemporalComponent.duration;
 
 import dev.pgm.community.Community;
-import dev.pgm.community.CommunityPermissions;
 import dev.pgm.community.moderation.punishments.Punishment;
 import dev.pgm.community.moderation.punishments.types.MutePunishment;
 import dev.pgm.community.moderation.tools.ModerationTools;
@@ -57,18 +56,15 @@ public class PGMPunishmentIntegration implements PunishmentIntegration, Listener
         .orElse(null);
   }
 
+  // Note: each tool checks its own permission (STAFF by default, per-tool for custom tools)
   @EventHandler(priority = EventPriority.HIGH)
   public void giveTools(ObserverKitApplyEvent event) {
-    if (event.getPlayer().getBukkit().hasPermission(CommunityPermissions.STAFF)) {
-      tools.giveTools(event.getPlayer().getBukkit());
-    }
+    tools.giveTools(event.getPlayer().getBukkit());
   }
 
   @EventHandler(priority = EventPriority.LOW)
   public void onInteractEvent(ObserverInteractEvent event) {
-    if (event.getPlayer().getBukkit().hasPermission(CommunityPermissions.STAFF)) {
-      tools.onInteract(event);
-    }
+    tools.onInteract(event);
   }
 
   @EventHandler

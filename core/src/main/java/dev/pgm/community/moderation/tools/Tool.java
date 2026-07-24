@@ -14,6 +14,8 @@ public interface Tool {
 
   String getName();
 
+  String getPermission();
+
   List<String> getLore();
 
   Material getMaterial();

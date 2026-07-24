@@ -3,6 +3,7 @@ package dev.pgm.community.moderation.tools;
 import static dev.pgm.community.utils.MessageUtils.colorizeList;
 import static tc.oc.pgm.util.bukkit.BukkitUtils.colorize;
 
+import dev.pgm.community.CommunityPermissions;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.inventory.ItemFlag;
@@ -25,8 +26,14 @@ public abstract class ToolBase implements Tool {
   public abstract void onRightClick(ObserverInteractEvent event);
 
   @Override
+  public String getPermission() {
+    return CommunityPermissions.STAFF;
+  }
+
+  @Override
   public void onInteract(ObserverInteractEvent event) {
     if (!enabled) return;
+    if (!event.getPlayer().getBukkit().hasPermission(getPermission())) return;
     if (event.getClickedItem() != null) {
       ItemStack clickedItem = event.getClickedItem();
       if (clickedItem.isSimilar(getItem())) {
@@ -43,6 +50,7 @@ public abstract class ToolBase implements Tool {
   @Override
   public void give(Player player) {
     if (!enabled) return;
+    if (!player.hasPermission(getPermission())) return;
     player.getInventory().setItem(slot, getItem());
   }
 

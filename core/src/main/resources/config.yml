@@ -103,9 +103,31 @@ moderation:
     player-hook: 
       enabled: true  # Whether player hook is enabled
       item-slot: 3   # Slot where player hook is located
-    lookup-sign: 
+    lookup-sign:
       enabled: true  # Whether lookup sign is enabled
       item-slot: 30  # Slot where lookup sign is located
+
+    # Custom observer tools that run commands when clicked.
+    # Material supports any material name or a custom head using
+    # "skull:<texture-url>" or "skull:<base64-texture-value>".
+    # Variables: %player% = clicked player's real name, %sender% = tool user.
+    # Actions: left-click, right-click (air), right-click-player (player).
+    # Run as: player (default) or console.
+    # Permission: Who receives and can use the item (default: community.staff).
+    # Cooldown: Optional per-player cooldown (for example, 3s or 1m).
+    # custom:
+    #   slap-stick:
+    #     enabled: true
+    #     slot: 5
+    #     material: STICK
+    #     name: "&6&lSlap Stick"
+    #     lore:
+    #       - "&7Right-click a &bplayer&7 to slap them"
+    #     permission: community.staff
+    #     cooldown: 3s
+    #     run-as: player
+    #     actions:
+    #       right-click-player: "slap %player%"
   
 # Reports - Settings related to /report and /reports
 reports:

@@ -196,6 +196,9 @@ public class FeatureManager {
     // Reload all config values here
     getReports().getConfig().reload(config);
     getModeration().getConfig().reload(config);
+    if (getModeration().getTools() != null) {
+      getModeration().getTools().reload(getModeration().getModerationConfig());
+    }
     getUsers().getConfig().reload(config);
     getSessions().getConfig().reload(config);
     getAltRisk().getConfig().reload(config);

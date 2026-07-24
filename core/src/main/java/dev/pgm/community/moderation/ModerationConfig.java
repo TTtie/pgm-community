@@ -5,8 +5,12 @@ import static tc.oc.pgm.util.text.TextParser.parseDuration;
 import dev.pgm.community.feature.config.FeatureConfigImpl;
 import dev.pgm.community.moderation.feature.ModerationFeature;
 import dev.pgm.community.moderation.punishments.Punishment;
+import dev.pgm.community.moderation.tools.CustomToolConfig;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import org.bukkit.configuration.Configuration;
+import org.bukkit.configuration.ConfigurationSection;
 import tc.oc.pgm.util.bukkit.BukkitUtils;
 
 public class ModerationConfig extends FeatureConfigImpl {
@@ -41,6 +45,7 @@ public class ModerationConfig extends FeatureConfigImpl {
   private static final String MOD_MENU_KEY = TOOLS_KEY + ".mod-menu";
   private static final String PLAYER_HOOK_KEY = TOOLS_KEY + ".player-hook";
   private static final String LOOKUP_SIGN_KEY = TOOLS_KEY + ".lookup-sign";
+  private static final String CUSTOM_TOOLS_KEY = TOOLS_KEY + ".custom";
 
   private static final String SIGN_LOGGER_KEY = KEY + ".sign-logger";
   private static final String BLOCK_GLITCH_LOGGER_KEY = KEY + ".block-glitch-logger";
@@ -90,6 +95,7 @@ public class ModerationConfig extends FeatureConfigImpl {
   private int modMenuSlot;
   private int playerHookSlot;
   private int lookupSignSlot;
+  private List<CustomToolConfig> customTools;
 
   // Sign Logger
   private boolean signLoggerEnabled;
@@ -245,6 +251,10 @@ public class ModerationConfig extends FeatureConfigImpl {
     return lookupSignSlot;
   }
 
+  public List<CustomToolConfig> getCustomTools() {
+    return customTools;
+  }
+
   public String getGlobalBroadcastFormat() {
     return globalBroadcastFormat;
   }
@@ -309,6 +319,18 @@ public class ModerationConfig extends FeatureConfigImpl {
     this.modMenuSlot = config.getInt(getItemSlotKey(MOD_MENU_KEY));
     this.playerHookSlot = config.getInt(getItemSlotKey(PLAYER_HOOK_KEY));
     this.lookupSignSlot = config.getInt(getItemSlotKey(LOOKUP_SIGN_KEY));
+
+    // Custom tools
+    this.customTools = new ArrayList<>();
+    ConfigurationSection customSection = config.getConfigurationSection(CUSTOM_TOOLS_KEY);
+    if (customSection != null) {
+      for (String id : customSection.getKeys(false)) {
+        ConfigurationSection toolSection = customSection.getConfigurationSection(id);
+        if (toolSection != null) {
+          customTools.add(CustomToolConfig.parse(id, toolSection));
+        }
+      }
+    }
 
     // Sign Logger
     this.signLoggerEnabled = config.getBoolean(getEnabledKey(SIGN_LOGGER_KEY));
