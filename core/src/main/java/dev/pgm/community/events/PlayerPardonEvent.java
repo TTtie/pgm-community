@@ -3,7 +3,7 @@ package dev.pgm.community.events;
 import dev.pgm.community.moderation.punishments.PunishmentType;
 import dev.pgm.community.utils.CommandAudience;
 import java.util.UUID;
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /** PlayerPardonEvent - Called when a punishment is pardoned */
 public class PlayerPardonEvent extends CommunityEvent {
