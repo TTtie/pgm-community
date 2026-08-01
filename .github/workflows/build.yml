@@ -35,15 +35,16 @@ jobs:
           name: Community.jar
           path: build/libs/Community.jar
           if-no-files-found: error
+          archive: false
       - name: release vars
-        if: github.repository == 'PGMDev/Community' && github.ref == 'refs/heads/dev'
+        # if: github.repository == 'PGMDev/Community' && github.ref == 'refs/heads/dev'
         run: echo "sha_short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
         id: release_vars
       - name: release
-        if: github.repository == 'PGMDev/Community' && github.ref == 'refs/heads/dev'
+        # if: github.repository == 'PGMDev/Community' && github.ref == 'refs/heads/dev'
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
-          tag_name: dev-${{ steps.release_vars.outputs.sha_short }}
+          tag_name: dev
           name: Dev build ${{ steps.release_vars.outputs.sha_short }}
           prerelease: true
           files: build/libs/Community.jar
