@@ -12,14 +12,16 @@ import com.viaversion.viaversion.api.protocol.version.ProtocolVersion;
 import com.viaversion.viaversion.api.type.Types;
 import com.viaversion.viaversion.libs.gson.JsonParser;
 import com.viaversion.viaversion.libs.mcstructs.text.utils.JsonNbtConverter;
+import com.viaversion.viaversion.protocols.v1_20to1_20_2.storage.ConfigurationState;
+import dev.pgm.community.Community;
 import dev.pgm.community.serverlinks.types.ServerLink;
 import java.util.List;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
 import org.bukkit.entity.Player;
-import org.jetbrains.annotations.NotNullByDefault;
+import org.jspecify.annotations.NullMarked;
 
-@NotNullByDefault
+@NullMarked
 public class ViaServerLinks {
   private static final Protocol<?, ?, ?, ?> serverLinkProtocol = findServerLinkProtocol();
 
@@ -32,7 +34,21 @@ public class ViaServerLinks {
             .protocolVersion()
             .newerThanOrEqualTo(ProtocolVersion.v1_21)) {
       PacketWrapper serverLinksPacket = createPacket(userConnection, serverLinks);
-      serverLinksPacket.scheduleSend(serverLinkProtocol.getClass());
+      var maybeConfigState = userConnection.get(ConfigurationState.class);
+      assert maybeConfigState != null; // will be present for 1.21+ connections
+      if (maybeConfigState.bridgePhase() != ConfigurationState.BridgePhase.NONE) {
+        // The client is in config phase, queue the packet up so the client doesn't crash
+        // This does get sent through the 1.20 -> 1.20.2 protocol internally, and thus is
+        // technically wrong, but it seems to go through and upgrade to the client's version just
+        // fine.
+        Community.get()
+            .getLogger()
+            .info("Queuing SERVER_LINKS packet for player " + player
+                + " because they are still in config phase");
+        maybeConfigState.addClientboundPacketToQueue(serverLinksPacket);
+      } else {
+        serverLinksPacket.scheduleSend(serverLinkProtocol.getClass());
+      }
     }
   }
 

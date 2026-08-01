@@ -10,10 +10,10 @@ import java.util.List;
 import org.bukkit.ServerLinks;
 import org.bukkit.craftbukkit.CraftServerLinks;
 import org.bukkit.entity.Player;
-import org.jetbrains.annotations.NotNullByDefault;
+import org.jspecify.annotations.NullMarked;
 
 @Supports(PAPER)
-@NotNullByDefault
+@NullMarked
 public class ModernServerLinksPlatform implements ServerLinksFeature.ServerLinksPlatform {
   @Override
   public void sendToPlayer(Player player, List<ServerLink> serverLinks) {

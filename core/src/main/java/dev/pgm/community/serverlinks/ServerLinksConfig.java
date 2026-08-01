@@ -12,11 +12,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.bukkit.configuration.Configuration;
-import org.jetbrains.annotations.NotNullByDefault;
-import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
-@NotNullByDefault
+@NullMarked
 public class ServerLinksConfig extends FeatureConfigImpl {
   private static final String KEY = "server-links";
   private static final String LINKS_KEY = "links";
