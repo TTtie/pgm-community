@@ -17,6 +17,7 @@ import dev.pgm.community.utils.compatibility.Materials;
 import fr.minuskube.inv.ClickableItem;
 import fr.minuskube.inv.content.InventoryContents;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.bukkit.Bukkit;
 import org.bukkit.DyeColor;
@@ -101,7 +102,8 @@ public class MapPartyMainMenu extends MapPartyMenu {
                 .build(),
             c -> selectTypeSub.open(this)));
 
-    List<MapPartyPreset> presets = getFeature().getPresets();
+    List<Map.Entry<String, MapPartyPreset>> presets =
+        getFeature().getPresets().entrySet().stream().toList();
     int[] SLOTS = {1, 3, 5, 7};
     for (int i = 0; i < SLOTS.length; i++) {
       ClickableItem item = getEmptyItem(i);
@@ -192,7 +194,8 @@ public class MapPartyMainMenu extends MapPartyMenu {
         c -> new MapPartyModifierMenu(getFeature(), getViewer()));
   }
 
-  private ClickableItem getPresetIcon(MapPartyPreset preset) {
+  private ClickableItem getPresetIcon(Map.Entry<String, MapPartyPreset> presetEntry) {
+    MapPartyPreset preset = presetEntry.getValue();
     List<String> lore = Lists.newArrayList();
     lore.add(colorize("&6Description&7: &3" + preset.description()));
     lore.add(colorize("&6Mode&7: &a" + preset.getType().getName()));
@@ -214,12 +217,12 @@ public class MapPartyMainMenu extends MapPartyMenu {
             .lore(lore.toArray(new String[0]))
             .build(),
         c -> {
-          String command = "event preset " + preset.name();
+          String command = "event preset " + presetEntry.getKey();
           if (getFeature().requiresForceForCreate()) {
             new MapPartyCreateConfirmMenu(
                     getFeature(),
                     getViewer(),
-                    "event preset --force " + preset.name(),
+                    "event preset --force " + presetEntry.getKey(),
                     preset.name())
                 .open(this);
           } else {

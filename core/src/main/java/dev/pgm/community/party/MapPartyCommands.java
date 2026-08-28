@@ -15,6 +15,7 @@ import dev.pgm.community.party.menu.maps.MapMenu;
 import dev.pgm.community.party.presets.MapPartyPreset;
 import dev.pgm.community.utils.CommandAudience;
 import java.time.Duration;
+import java.util.stream.Stream;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.entity.Player;
 import tc.oc.pgm.api.map.MapInfo;
@@ -25,6 +26,9 @@ import tc.oc.pgm.lib.org.incendo.cloud.annotations.Command;
 import tc.oc.pgm.lib.org.incendo.cloud.annotations.Default;
 import tc.oc.pgm.lib.org.incendo.cloud.annotations.Flag;
 import tc.oc.pgm.lib.org.incendo.cloud.annotations.Permission;
+import tc.oc.pgm.lib.org.incendo.cloud.annotations.suggestion.Suggestions;
+import tc.oc.pgm.lib.org.incendo.cloud.context.CommandContext;
+import tc.oc.pgm.util.LiquidMetal;
 import tc.oc.pgm.util.named.NameStyle;
 
 @Command("event")
@@ -66,7 +70,7 @@ public class MapPartyCommands extends CommunityCommand {
   public void createPreset(
       CommandAudience viewer,
       Player sender,
-      @Argument("name") @Greedy String presetName,
+      @Argument(value = "name", suggestions = "partyPresets") @Greedy String presetName,
       @Flag(value = "force", aliases = "f") boolean force) {
     if (party.getParty() != null) {
       viewer.sendWarning(MapPartyMessages.CREATION_ERROR);
@@ -258,6 +262,11 @@ public class MapPartyCommands extends CommunityCommand {
   public void toggleAutoScale(CommandAudience viewer, @Argument("autoscale") boolean autoscaling) {
     if (isPartyMissing(viewer)) return;
     party.setAutoScale(viewer, autoscaling);
+  }
+
+  @Suggestions("partyPresets")
+  public Stream<String> suggestPresets(CommandContext<CommandAudience> ctx, String input) {
+    return party.getPresets().keySet().stream().filter(name -> LiquidMetal.match(name, input));
   }
 
   private boolean isPartyMissing(CommandAudience viewer) {

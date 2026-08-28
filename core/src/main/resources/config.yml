@@ -357,6 +357,7 @@ party:
       - "&a$time$ &7left of $name$;/party;&7To view more party info, click here;15m"
   
   # Preset party types that will show up in the GUI for instant use
+  # A party can also be created from a preset using /party preset <preset_id>
   presets:
     # An example party preset
     staff_party:
@@ -364,7 +365,7 @@ party:
       name: "&d&lStaff Party"
       # Description of party used to inform joining players
       description: "&3A fun selection of party maps"
-      # Duration of time party will be active for (-1 for no limit)                  
+      # Duration of time party will be active for (-1 for no limit)
       duration: "30m"
       # Map pool used if mode is REGULAR
       pool: "fun"

@@ -33,6 +33,7 @@ import dev.pgm.community.utils.PaginatedComponentResults;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.logging.Logger;
@@ -50,6 +51,7 @@ import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.server.ServerListPingEvent;
+import org.jspecify.annotations.Nullable;
 import tc.oc.pgm.api.map.MapInfo;
 import tc.oc.pgm.api.match.Match;
 import tc.oc.pgm.api.match.event.MatchAfterLoadEvent;
@@ -112,7 +114,7 @@ public class MapPartyFeature extends FeatureBase {
     return party;
   }
 
-  public List<MapPartyPreset> getPresets() {
+  public Map<String, MapPartyPreset> getPresets() {
     return getEventConfig().getPresets();
   }
 
@@ -124,11 +126,8 @@ public class MapPartyFeature extends FeatureBase {
     return historyStore.mostRecent();
   }
 
-  public MapPartyPreset getPreset(String presetName) {
-    return getPresets().stream()
-        .filter(preset -> cleanName(preset.name()).equalsIgnoreCase(presetName))
-        .findAny()
-        .orElse(null);
+  public @Nullable MapPartyPreset getPreset(String presetName) {
+    return getPresets().get(presetName);
   }
 
   private String cleanName(String name) {

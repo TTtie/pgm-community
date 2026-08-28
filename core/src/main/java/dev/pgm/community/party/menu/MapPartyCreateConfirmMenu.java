@@ -62,7 +62,11 @@ public class MapPartyCreateConfirmMenu extends MapPartyMenu {
             .build(),
         c -> {
           Bukkit.dispatchCommand(getViewer(), forceCommand);
-          close();
+          if (getParent() != null) {
+            getParent().open();
+          } else {
+            close();
+          }
         });
 
     for (int row = 2; row <= 4; row++) {

@@ -21,7 +21,7 @@ public class MapPartyConfig extends FeatureConfigImpl {
   private static final String KEY = "party";
 
   private Duration duration;
-  private List<MapPartyPreset> presets;
+  private Map<String, MapPartyPreset> presets;
 
   // Event Welcome / goodbye message
   private String welcomeLine;
@@ -63,7 +63,7 @@ public class MapPartyConfig extends FeatureConfigImpl {
     return duration;
   }
 
-  public List<MapPartyPreset> getPresets() {
+  public Map<String, MapPartyPreset> getPresets() {
     return presets;
   }
 
@@ -164,15 +164,15 @@ public class MapPartyConfig extends FeatureConfigImpl {
     this.hostPermissions = parsePermissions(config.getStringList(KEY + ".host-permissions"));
   }
 
-  private List<MapPartyPreset> parsePresets(ConfigurationSection section) {
+  private Map<String, MapPartyPreset> parsePresets(ConfigurationSection section) {
     if (section == null) {
-      return Lists.newArrayList();
+      return Maps.newHashMap();
     }
-    List<MapPartyPreset> presetList = Lists.newArrayList();
+    Map<String, MapPartyPreset> presetMap = Maps.newHashMap();
     for (String key : section.getKeys(false)) {
-      presetList.add(MapPartyPreset.of(section.getConfigurationSection(key)));
+      presetMap.put(key, MapPartyPreset.of(section.getConfigurationSection(key)));
     }
-    return presetList;
+    return presetMap;
   }
 
   private Permission parsePermissions(List<String> permissions) {
